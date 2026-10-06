@@ -1,6 +1,3 @@
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-
 {{-- ============ MODULE 1: DASHBOARD OVERVIEW ============ --}}
 <div class="space-y-6">
 
@@ -56,59 +53,154 @@
     <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
 
         <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
-            <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-base font-semibold text-slate-800">Live Emergency Map — Parañaque City</h2>
-                <span class="text-xs text-slate-400">Leaflet GIS feed</span>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-800">Live Emergency Map — Parañaque City</h2>
+                    <p class="text-xs text-slate-400">OpenStreetMap / Leaflet GIS telemetry</p>
+                </div>
+                
+                {{-- Legend --}}
+                <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-600">
+                        <span class="h-2.5 w-2.5 rounded-full bg-critical-500 animate-pulse"></span>
+                        High Urgency
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-600">
+                        <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                        Responding / Low
+                    </span>
+                    <span class="inline-flex items-center gap-1.5 font-medium text-slate-600">
+                        <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                        Resolved
+                    </span>
+                </div>
             </div>
 
-            {{-- Changed w-full and adjusted padding or margins if needed --}}
+            {{-- Leaflet Map Container --}}
             <div 
                 id="emergency-map" 
-                class="relative h-80 w-full -mx-5 -mb-5 mt-4 overflow-hidden rounded-b-xl z-0" 
+                style="height: 420px; min-height: 420px; width: 100%;"
+                class="relative h-[420px] w-full -mx-5 -mb-5 mt-3 overflow-hidden rounded-b-xl z-0 border-t border-slate-100" 
                 wire:ignore 
                 x-init="
-                    const map = L.map($el).setView([14.4793, 121.0198], 14);
-                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                        attribution: '&copy; OpenStreetMap contributors'
-                    }).addTo(map);
+                    const initMapWhenReady = () => {
+                        if (typeof L === 'undefined') {
+                            setTimeout(initMapWhenReady, 100);
+                            return;
+                        }
 
-                    setTimeout(() => {
-                        map.invalidateSize();
-                    }, 100);
+                        const paranaqueCenter = [14.4793, 121.0198];
+                        const map = L.map($el, {
+                            zoomControl: true,
+                            scrollWheelZoom: true
+                        }).setView(paranaqueCenter, 13);
 
-                    const markers = {};
-                    function syncMarkers() {
-                        if (!Array.isArray(emergencies)) return;
-                        
-                        emergencies.forEach(e => {
-                            if (!e.lat || !e.lng) return;
-                            
-                            if (!markers[e.id]) {
-                                const color = e.status === 'resolved' ? '#10B981' : (e.urgency === 'high' ? '#D9534F' : '#F59E0B');
-                                
-                                const popupContent = `
-                                    <div style='font-family: inherit;'>
-                                        <b style='font-size: 13px;'>${e.child ? e.child.name : 'Unknown'}</b><br>
-                                        <span style='font-size: 11px; color: #64748b;'>${e.child && e.child.condition ? e.child.condition : ''}</span><br>
-                                        <span style='font-size: 11px;'>${e.location || ''}</span>
-                                    </div>
-                                `;
+                        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                            attribution: '&copy; <a href=\'https://www.openstreetmap.org/copyright\' target=\'_blank\'>OpenStreetMap</a> contributors',
+                            maxZoom: 19
+                        }).addTo(map);
 
-                                markers[e.id] = L.circleMarker([e.lat, e.lng], { 
-                                    radius: 8, 
-                                    color: '#ffffff', 
-                                    weight: 2,
-                                    fillColor: color, 
-                                    fillOpacity: 0.9 
-                                })
-                                .bindPopup(popupContent)
-                                .addTo(map);
+                        setTimeout(() => map.invalidateSize(), 150);
+                        setTimeout(() => map.invalidateSize(), 400);
+
+                        $watch('currentTab', tab => {
+                            if (tab === 'dashboard') {
+                                setTimeout(() => map.invalidateSize(), 150);
                             }
                         });
-                    }
-                    
-                    syncMarkers();
-                    $watch('emergencies', () => syncMarkers());
+
+                        const markers = {};
+
+                        function getMarkerColor(status, urgency) {
+                            if (status === 'resolved') return '#10B981';
+                            if (urgency === 'high') return '#D9534F';
+                            return '#F59E0B';
+                        }
+
+                        function buildPopupHtml(e) {
+                            const statusBadge = e.status === 'resolved' 
+                                ? `<span style='background: #ecfdf5; color: #047857; padding: 2px 7px; border-radius: 9999px; font-weight: 600; font-size: 10px; text-transform: uppercase;'>Resolved</span>`
+                                : (e.status === 'responding'
+                                    ? `<span style='background: #f0f9ff; color: #0369a1; padding: 2px 7px; border-radius: 9999px; font-weight: 600; font-size: 10px; text-transform: uppercase;'>Responding</span>`
+                                    : `<span style='background: #fef2f2; color: #b91c1c; padding: 2px 7px; border-radius: 9999px; font-weight: 600; font-size: 10px; text-transform: uppercase;'>Pending</span>`);
+                            
+                            const urgencyBadge = e.urgency === 'high'
+                                ? `<span style='background: #fef2f2; color: #dc2626; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 10px;'>High Urgency</span>`
+                                : `<span style='background: #fffbeb; color: #d97706; padding: 2px 6px; border-radius: 4px; font-weight: 600; font-size: 10px;'>Low Urgency</span>`;
+
+                            const childName = (e.child && e.child.name) ? e.child.name : 'Unknown Child';
+                            const childCondition = (e.child && e.child.condition) ? e.child.condition : 'Condition not specified';
+                            const locationText = e.location || 'Parañaque City';
+                            const notesHtml = e.guardianNotes ? `<div style='font-size: 11px; background: #fffbeb; border: 1px solid #fef3c7; border-radius: 6px; padding: 5px 8px; color: #92400e; margin-top: 6px;'><b>Notes:</b> ${e.guardianNotes}</div>` : '';
+                            const coordsHtml = e.coords ? `<div style='font-size: 10px; font-family: monospace; color: #94a3b8; margin-top: 3px;'>${e.coords}</div>` : '';
+
+                            return `
+                                <div style='font-family: inherit; min-width: 210px; padding: 2px 0;'>
+                                    <div style='display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;'>
+                                        ${urgencyBadge}
+                                        ${statusBadge}
+                                    </div>
+                                    <div style='font-size: 14px; font-weight: 700; color: #1e293b; line-height: 1.2;'>${childName}</div>
+                                    <div style='font-size: 11px; font-weight: 600; color: #005B96; margin-top: 2px;'>${childCondition}</div>
+                                    <div style='font-size: 11px; color: #475569; margin-top: 6px;'>
+                                        <span>📍</span> <b>${locationText}</b>
+                                    </div>
+                                    ${coordsHtml}
+                                    ${notesHtml}
+                                </div>
+                            `;
+                        }
+
+                        function syncMarkers() {
+                            if (!Array.isArray(emergencies)) return;
+
+                            const currentIds = new Set();
+                            
+                            emergencies.forEach(e => {
+                                if (e.lat === null || e.lng === null || e.lat === undefined || e.lng === undefined) return;
+                                const lat = parseFloat(e.lat);
+                                const lng = parseFloat(e.lng);
+                                if (isNaN(lat) || isNaN(lng)) return;
+
+                                currentIds.add(e.id);
+                                const color = getMarkerColor(e.status, e.urgency);
+                                const popupContent = buildPopupHtml(e);
+                                const radius = (e.urgency === 'high' && e.status !== 'resolved') ? 9 : 7;
+
+                                if (markers[e.id]) {
+                                    markers[e.id].setLatLng([lat, lng]);
+                                    markers[e.id].setStyle({ 
+                                        fillColor: color,
+                                        radius: radius 
+                                    });
+                                    markers[e.id].setPopupContent(popupContent);
+                                } else {
+                                    markers[e.id] = L.circleMarker([lat, lng], { 
+                                        radius: radius, 
+                                        color: '#ffffff', 
+                                        weight: 2,
+                                        fillColor: color, 
+                                        fillOpacity: 0.95 
+                                    })
+                                    .bindPopup(popupContent)
+                                    .addTo(map);
+                                }
+                            });
+
+                            // Remove markers that are no longer in emergencies
+                            for (const id in markers) {
+                                if (!currentIds.has(Number(id)) && !currentIds.has(String(id))) {
+                                    map.removeLayer(markers[id]);
+                                    delete markers[id];
+                                }
+                            }
+                        }
+                        
+                        syncMarkers();
+                        $watch('emergencies', () => syncMarkers());
+                    };
+
+                    initMapWhenReady();
                 "
             ></div>
         </div>

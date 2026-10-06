@@ -30,7 +30,12 @@
         ::-webkit-scrollbar { width: 8px; height: 8px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
         .focus-ring:focus-visible { outline: 3px solid #005B96; outline-offset: 2px; }
+        #emergency-map { height: 420px !important; min-height: 420px !important; width: 100% !important; }
+        .leaflet-popup-content-wrapper { border-radius: 0.75rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); }
+        .leaflet-popup-content { margin: 12px 14px; line-height: 1.4; font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 </head>
 <body class="h-full bg-slate-50 text-slate-800 antialiased"
       x-data="csnApp()"

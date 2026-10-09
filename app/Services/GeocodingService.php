@@ -42,6 +42,7 @@ class GeocodingService
      * Default center coordinates for Parañaque City.
      */
     public const DEFAULT_LAT = 14.4793;
+
     public const DEFAULT_LNG = 121.0198;
 
     /**
@@ -121,4 +122,3 @@ class GeocodingService
         ];
     }
 }
-

@@ -1,34 +1,47 @@
 {{-- ============ MODULE 2: EMERGENCY CENTER ============ --}}
 <div class="space-y-5">
 
-    {{-- Filter controls --}}
-    <div class="flex flex-wrap gap-2" role="tablist" aria-label="Filter emergencies">
-        @php
-            $filters = [
-                ['key' => 'all', 'label' => 'All'],
-                ['key' => 'high', 'label' => 'High Urgency'],
-                ['key' => 'low', 'label' => 'Low Urgency'],
-                ['key' => 'pending', 'label' => 'Pending'],
-                ['key' => 'responding', 'label' => 'Responding'],
-                ['key' => 'resolved', 'label' => 'Resolved'],
-            ];
-        @endphp
-        @foreach ($filters as $f)
-            <button
-                type="button"
-                @click="emergencyFilter = '{{ $f['key'] }}'"
-                class="min-h-[44px] rounded-full px-4 text-sm font-medium transition focus-ring"
-                :class="emergencyFilter === '{{ $f['key'] }}' ? 'bg-brand-700 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'"
-            >
-                {{ $f['label'] }}
-            </button>
-        @endforeach
+    {{-- Top Bar: Filter controls + Log Emergency button --}}
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex flex-wrap gap-2" role="tablist" aria-label="Filter emergencies">
+            @php
+                $filters = [
+                    ['key' => 'all', 'label' => 'All'],
+                    ['key' => 'high', 'label' => 'High Urgency'],
+                    ['key' => 'low', 'label' => 'Low Urgency'],
+                    ['key' => 'pending', 'label' => 'Pending'],
+                    ['key' => 'responding', 'label' => 'Responding'],
+                    ['key' => 'resolved', 'label' => 'Resolved'],
+                ];
+            @endphp
+            @foreach ($filters as $f)
+                <button
+                    type="button"
+                    @click="emergencyFilter = '{{ $f['key'] }}'"
+                    class="min-h-[44px] rounded-full px-4 text-sm font-medium transition focus-ring"
+                    :class="emergencyFilter === '{{ $f['key'] }}' ? 'bg-brand-700 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'"
+                >
+                    {{ $f['label'] }}
+                </button>
+            @endforeach
+        </div>
+
+        <button
+            type="button"
+            @click="activeModal = 'logEmergency'"
+            class="min-h-[44px] inline-flex items-center justify-center gap-2 rounded-lg bg-critical-500 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-critical-600 focus-ring transition shrink-0"
+        >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Log Emergency
+        </button>
     </div>
 
     {{-- Empty state --}}
     <div x-show="filteredEmergencies.length === 0" x-cloak class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
         <p class="text-sm font-medium text-slate-600">No emergencies match this filter.</p>
-        <p class="mt-1 text-xs text-slate-400">Try a different filter, or check back once a new alert comes in.</p>
+        <p class="mt-1 text-xs text-slate-400">Try a different filter, or click "Log Emergency" to report an active alert.</p>
     </div>
 
     {{-- Emergency cards --}}
@@ -80,6 +93,20 @@
                     <p class="mt-1 text-sm text-slate-600" x-text="e.guardianNotes"></p>
                 </div>
 
+                {{-- Dispatched Responder Info --}}
+                <div x-show="e.responder" class="mt-3 flex items-center justify-between rounded-lg border border-sky-100 bg-sky-50/70 p-3 text-xs">
+                    <div class="flex items-center gap-2">
+                        <svg class="h-4 w-4 text-sky-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <div>
+                            <p class="font-semibold text-sky-900" x-text="'Assigned Unit: ' + (e.responder?.name || 'Responder')"></p>
+                            <p class="text-sky-700 font-mono" x-text="e.responder?.phone ? 'Phone: ' + e.responder?.phone : 'Direct unit'"></p>
+                        </div>
+                    </div>
+                    <span class="rounded bg-sky-200/60 px-2 py-0.5 font-medium text-sky-800" x-text="e.dispatchedAt ? 'Dispatched ' + e.dispatchedAt : 'Assigned'"></span>
+                </div>
+
                 {{-- Actions --}}
                 <div class="mt-4 flex flex-wrap gap-2">
                     <button type="button" @click="acknowledge(e.id)" :disabled="e.status !== 'pending'"
@@ -101,5 +128,93 @@
                 </div>
             </div>
         </template>
+    </div>
+
+    {{-- Log Emergency Modal Form --}}
+    <div x-show="activeModal === 'logEmergency'" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="activeModal = null"></div>
+
+        <div class="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-900/10">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800">Log Emergency Alert</h3>
+                    <p class="text-xs text-slate-500">Record a crisis event and broadcast immediately to active responders.</p>
+                </div>
+                <button type="button" @click="activeModal = null" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-ring">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <form @submit.prevent="submitEmergency()" class="mt-4 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Child Profile <span class="text-red-500">*</span></label>
+                    <select x-model="newEmergency.child_id" required class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring bg-white">
+                        <option value="">-- Select enrolled child --</option>
+                        <template x-for="c in children" :key="c.id">
+                            <option :value="c.id" x-text="c.name + ' (' + c.condition + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Emergency Type <span class="text-red-500">*</span></label>
+                        <select x-model="newEmergency.type" required class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring bg-white">
+                            <option value="medical_crisis">Medical Crisis</option>
+                            <option value="seizure_sensory">Seizure / Sensory</option>
+                            <option value="fire">Fire / Danger</option>
+                            <option value="wandering">Wandering / Elopement</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Urgency Level <span class="text-red-500">*</span></label>
+                        <select x-model="newEmergency.urgency" required class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring bg-white">
+                            <option value="high">High (Immediate Danger)</option>
+                            <option value="low">Low (Routine Assistance)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Location <span class="text-red-500">*</span></label>
+                    <input type="text" x-model="newEmergency.location" required placeholder="e.g. San Antonio Valley 1, Parañaque City" class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                    <p class="mt-1 text-[11px] text-slate-400">Coordinates are automatically geocoded if left blank.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Latitude (Optional)</label>
+                        <input type="number" step="any" x-model="newEmergency.lat" placeholder="14.4793" class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm font-mono focus-ring">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Longitude (Optional)</label>
+                        <input type="number" step="any" x-model="newEmergency.lng" placeholder="121.0198" class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm font-mono focus-ring">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Assign Responder Unit (Optional)</label>
+                    <select x-model="newEmergency.responder_id" class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring bg-white">
+                        <option value="">-- Auto / Dispatch Later --</option>
+                        <template x-for="u in users.filter(usr => (usr.role || '').toLowerCase() === 'responder')" :key="u.id">
+                            <option :value="u.id" x-text="u.name + ' (' + (u.phone || 'No phone') + ')'"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Guardian / Clinical Notes</label>
+                    <textarea x-model="newEmergency.guardian_notes" rows="2" placeholder="Sensory triggers, medications, calming techniques..." class="w-full rounded-lg border border-slate-300 p-2.5 text-sm focus-ring"></textarea>
+                </div>
+
+                <div class="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+                    <button type="button" @click="activeModal = null" class="min-h-[42px] rounded-lg px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 focus-ring">Cancel</button>
+                    <button type="submit" :disabled="isSubmittingEmergency" class="min-h-[42px] inline-flex items-center gap-2 rounded-lg bg-critical-500 px-5 text-sm font-semibold text-white shadow-sm hover:bg-critical-600 focus-ring disabled:opacity-50">
+                        <span x-show="!isSubmittingEmergency">Log Alert & Broadcast</span>
+                        <span x-show="isSubmittingEmergency">Submitting...</span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 </div>

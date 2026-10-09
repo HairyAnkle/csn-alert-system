@@ -8,6 +8,7 @@
             <input
                 type="text"
                 x-model="childSearch"
+                @input.debounce.300ms="searchChildrenServer()"
                 placeholder="Search by name, condition, or address"
                 class="min-h-[44px] w-full rounded-lg border border-slate-300 bg-white py-2 pl-10 pr-3 text-sm text-slate-700 focus-ring"
             >
@@ -28,6 +29,7 @@
                         <th class="px-4 py-3 text-left font-semibold text-slate-500">Child</th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-500">Age</th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-500">Condition</th>
+                        <th class="px-4 py-3 text-left font-semibold text-slate-500">Address</th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-500">Guardian</th>
                         <th class="px-4 py-3 text-left font-semibold text-slate-500">Emergency Contact</th>
                         <th class="px-4 py-3 text-right font-semibold text-slate-500">Actions</th>
@@ -38,17 +40,23 @@
                         <tr class="hover:bg-slate-50">
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-3">
-                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-800"
-                                         x-text="child.name.split(' ').map(n => n[0]).join('')"></div>
+                                    <template x-if="child.photoUrl">
+                                        <img :src="child.photoUrl" :alt="child.name" class="h-9 w-9 rounded-full object-cover ring-1 ring-slate-200">
+                                    </template>
+                                    <template x-if="!child.photoUrl">
+                                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-800"
+                                             x-text="child.avatarInitials || child.name.split(' ').map(n => n[0]).join('')"></div>
+                                    </template>
                                     <span class="font-medium text-slate-700" x-text="child.name"></span>
                                 </div>
                             </td>
                             <td class="px-4 py-3 text-slate-600" x-text="child.age"></td>
                             <td class="px-4 py-3 text-slate-600" x-text="child.condition"></td>
+                            <td class="px-4 py-3 text-xs text-slate-500" x-text="child.address || 'Parañaque City'"></td>
                             <td class="px-4 py-3 text-slate-600" x-text="child.guardian"></td>
                             <td class="px-4 py-3 font-mono text-xs text-slate-500" x-text="child.contact"></td>
                             <td class="px-4 py-3 text-right">
-                                <button type="button" @click="activeChild = child; activeModal = 'viewChild'"
+                                <button type="button" @click="viewChildProfile(child.id)"
                                         class="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 focus-ring">
                                     View Full Profile
                                 </button>
@@ -56,7 +64,7 @@
                         </tr>
                     </template>
                     <tr x-show="filteredChildren.length === 0" x-cloak>
-                        <td colspan="6" class="px-4 py-8 text-center text-sm text-slate-400">No children match your search.</td>
+                        <td colspan="7" class="px-4 py-8 text-center text-sm text-slate-400">No children match your search.</td>
                     </tr>
                 </tbody>
             </table>
@@ -72,37 +80,72 @@
             <template x-if="activeChild">
                 <div class="flex h-full flex-col">
                     <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                        <h2 class="text-base font-semibold text-slate-800">Full Medical Profile</h2>
+                        <div class="flex items-center gap-2">
+                            <h2 class="text-base font-semibold text-slate-800">Full Medical Profile</h2>
+                            <span class="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-600/20">DPA Protected</span>
+                        </div>
                         <button type="button" class="rounded-md p-2 text-slate-400 hover:bg-slate-100 focus-ring" @click="activeModal = null" aria-label="Close">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                         </button>
                     </div>
-                    <div class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+
+                    {{-- Loading state --}}
+                    <div x-show="isLoadingChild" class="p-6 text-center text-sm text-slate-500">
+                        <svg class="mx-auto h-6 w-6 animate-spin text-brand-700 mb-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                        </svg>
+                        Decrypting sensitive clinical record...
+                    </div>
+
+                    {{-- Profile details --}}
+                    <div x-show="!isLoadingChild" class="flex-1 space-y-5 overflow-y-auto px-5 py-5">
                         <div class="flex items-center gap-4">
-                            <div class="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-lg font-bold text-brand-800"
-                                 x-text="activeChild.name.split(' ').map(n => n[0]).join('')"></div>
+                            <template x-if="activeChild.photoUrl">
+                                <img :src="activeChild.photoUrl" :alt="activeChild.name" class="h-16 w-16 rounded-full object-cover ring-2 ring-brand-100">
+                            </template>
+                            <template x-if="!activeChild.photoUrl">
+                                <div class="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-lg font-bold text-brand-800"
+                                     x-text="activeChild.avatarInitials || activeChild.name.split(' ').map(n => n[0]).join('')"></div>
+                            </template>
                             <div>
                                 <p class="text-lg font-semibold text-slate-800" x-text="activeChild.name"></p>
-                                <p class="text-sm text-slate-500" x-text="'Age ' + activeChild.age"></p>
+                                <p class="text-sm text-slate-500" x-text="'Age ' + activeChild.age + (activeChild.birthdate ? ' (' + activeChild.birthdate + ')' : '')"></p>
                             </div>
                         </div>
+
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Condition</p>
-                            <p class="mt-1 text-sm text-slate-700" x-text="activeChild.condition"></p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Condition / Diagnosis</p>
+                            <p class="mt-1 text-sm font-medium text-slate-700" x-text="activeChild.condition"></p>
                         </div>
+
                         <div>
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Guardian</p>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Home Address</p>
+                            <p class="mt-1 text-sm text-slate-700" x-text="activeChild.address || 'Parañaque City'"></p>
+                        </div>
+
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Parent / Registered Guardian</p>
                             <p class="mt-1 text-sm text-slate-700" x-text="activeChild.guardian"></p>
                         </div>
+
                         <div>
                             <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Emergency Contact</p>
                             <p class="mt-1 font-mono text-sm text-slate-700" x-text="activeChild.contact"></p>
                         </div>
-                        <div class="rounded-lg bg-amber-50 p-3">
-                            <p class="text-xs font-semibold text-amber-700">Primary Medical Notes</p>
-                            <p class="mt-1 text-sm text-slate-700" x-text="activeChild.notes"></p>
+
+                        <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <p class="text-xs font-bold text-amber-800 flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5 text-amber-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    Primary Medical Notes (Decrypted)
+                                </p>
+                                <span class="text-[10px] text-amber-700/80 font-mono">RA 10173 Audit Logged</span>
+                            </div>
+                            <p class="text-sm leading-relaxed text-slate-700 whitespace-pre-line" x-text="activeChild.notes || 'No confidential medical notes recorded.'"></p>
                         </div>
                     </div>
+
                     <div class="border-t border-slate-200 px-5 py-4">
                         <button type="button" @click="activeModal = null"
                                 class="min-h-[44px] w-full rounded-lg bg-slate-800 text-sm font-semibold text-white hover:bg-slate-700 focus-ring">
@@ -121,60 +164,86 @@
              x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
              x-transition:leave="transition ease-in duration-150" x-transition:leave-start="translate-x-0" x-transition:leave-end="translate-x-full">
             <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-                <h2 class="text-base font-semibold text-slate-800">Add New Child Profile</h2>
+                <div>
+                    <h2 class="text-base font-semibold text-slate-800">Add New Child Profile</h2>
+                    <p class="text-xs text-slate-500">Sensitive health info will be stored with AES-256 encryption.</p>
+                </div>
                 <button type="button" class="rounded-md p-2 text-slate-400 hover:bg-slate-100 focus-ring" @click="activeModal = null" aria-label="Close">
                     <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
                 </button>
             </div>
-            <div class="flex-1 space-y-4 overflow-y-auto px-5 py-5" x-data="{ form: { name: '', age: '', condition: '', guardian: '', contact: '', notes: '' } }">
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-600">Full Name</label>
-                    <input type="text" x-model="form.name" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
+
+            <form @submit.prevent="saveChildProfile($el)" enctype="multipart/form-data" class="flex flex-1 flex-col justify-between overflow-hidden">
+                <div class="flex-1 space-y-4 overflow-y-auto px-5 py-5">
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-slate-600">Age</label>
-                        <input type="number" x-model="form.age" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                        <label class="mb-1 block text-sm font-medium text-slate-600">Full Name <span class="text-red-500">*</span></label>
+                        <input type="text" name="name" required placeholder="e.g. Mateo Santos" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
                     </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-slate-600">Age</label>
+                            <input type="number" name="age" min="0" max="100" placeholder="e.g. 8" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-slate-600">Birthdate</label>
+                            <input type="date" name="birthdate" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                        </div>
+                    </div>
+
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-slate-600">Condition</label>
-                        <input type="text" x-model="form.condition" placeholder="e.g. ASD" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                        <label class="mb-1 block text-sm font-medium text-slate-600">Condition / Needs <span class="text-red-500">*</span></label>
+                        <input type="text" name="condition" required placeholder="e.g. Autism Spectrum Disorder, Epilepsy" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-600">Home Address</label>
+                        <input type="text" name="address" placeholder="e.g. Phase 1, BF Homes, Parañaque City" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-slate-600">Guardian Name</label>
+                            <input type="text" name="guardian_name" placeholder="Parent or primary guardian" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-slate-600">Guardian Account</label>
+                            <select name="guardian_id" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm bg-white focus-ring">
+                                <option value="">-- Link registered user --</option>
+                                <template x-for="u in users.filter(usr => (usr.role || '').toLowerCase() === 'guardian')" :key="u.id">
+                                    <option :value="u.id" x-text="u.name"></option>
+                                </template>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-600">Emergency Contact</label>
+                        <input type="text" name="emergency_contact" placeholder="e.g. +63 918 333 4455" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm font-mono focus-ring">
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-600">Profile Photo</label>
+                        <input type="file" name="photo" accept="image/*" class="w-full text-xs text-slate-500 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-brand-50 file:text-brand-700 hover:file:bg-brand-100 focus-ring">
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-600">
+                            Primary Medical Notes
+                            <span class="text-xs text-slate-400 font-normal">(Encrypted under RA 10173)</span>
+                        </label>
+                        <textarea name="medical_notes" rows="3" placeholder="Sensory triggers, medications, non-verbal preferences, calming protocols..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"></textarea>
                     </div>
                 </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-600">Guardian Name</label>
-                    <input type="text" x-model="form.guardian" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-600">Emergency Contact</label>
-                    <input type="text" x-model="form.contact" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
-                </div>
-                <div>
-                    <label class="mb-1 block text-sm font-medium text-slate-600">Primary Medical Notes</label>
-                    <textarea x-model="form.notes" rows="4" placeholder="e.g. non-verbal, severe allergies" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"></textarea>
-                </div>
-                {{--
-                    TODO: replace this client-only push with a real submit, e.g.:
-                    async function save() {
-                        const res = await fetch('/children', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
-                            body: JSON.stringify(form)
-                        });
-                        const saved = await res.json();
-                        children.push(saved);
-                        activeModal = null;
-                    }
-                --}}
-                <div class="flex gap-2 pt-2">
+
+                <div class="flex gap-2 border-t border-slate-200 p-4">
                     <button type="button" @click="activeModal = null" class="min-h-[44px] flex-1 rounded-lg border border-slate-300 text-sm font-semibold text-slate-600 hover:bg-slate-50 focus-ring">Cancel</button>
-                    <button type="button"
-                            @click="children.push({ id: Date.now(), name: form.name || 'Unnamed Child', age: form.age || '—', condition: form.condition || '—', guardian: form.guardian || '—', contact: form.contact || '—', notes: form.notes || '—' }); activeModal = null"
-                            class="min-h-[44px] flex-1 rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800 focus-ring">
-                        Save Profile
+                    <button type="submit" :disabled="isSavingChild" class="min-h-[44px] inline-flex items-center justify-center gap-2 flex-1 rounded-lg bg-brand-700 text-sm font-semibold text-white hover:bg-brand-800 focus-ring disabled:opacity-50">
+                        <span x-show="!isSavingChild">Save Profile</span>
+                        <span x-show="isSavingChild">Saving...</span>
                     </button>
                 </div>
-            </div>
+            </form>
         </div>
     </div>
 </div>

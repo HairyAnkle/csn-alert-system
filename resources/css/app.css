@@ -1,9 +1,51 @@
-@import 'tailwindcss';
-
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+@import "tailwindcss";
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --color-brand-50: #eef5fb;
+    --color-brand-100: #d6e6f4;
+    --color-brand-700: #005b96;
+    --color-brand-800: #004a7a;
+    --color-brand-900: #003559;
+}
+
+@layer base {
+    /* Explicit form input standards ensuring touch-friendly height & padding */
+    input[type="text"],
+    input[type="email"],
+    input[type="password"],
+    input[type="number"],
+    input[type="date"],
+    select,
+    textarea {
+        min-height: 44px;
+        padding: 0.625rem 0.875rem;
+        font-size: 0.875rem;
+        line-height: 1.25rem;
+        border-radius: 0.5rem;
+        border: 1px solid #cbd5e1;
+        background-color: #ffffff;
+        color: #1e293b;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    input[type="text"]:focus,
+    input[type="email"]:focus,
+    input[type="password"]:focus,
+    input[type="number"]:focus,
+    input[type="date"]:focus,
+    select:focus,
+    textarea:focus {
+        outline: none;
+        border-color: #005b96;
+        box-shadow: 0 0 0 3px rgba(0, 91, 150, 0.2);
+    }
+
+    input[type="checkbox"] {
+        width: 1.125rem;
+        height: 1.125rem;
+        border-radius: 0.25rem;
+        border: 1px solid #cbd5e1;
+        accent-color: #005b96;
+        cursor: pointer;
+    }
 }

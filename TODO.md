@@ -178,3 +178,26 @@ Route::patch('/settings', [SettingController::class, 'update']);
 6. User Management CRUD
 7. Incident Reports exports
 8. Settings persistence + audit log
+
+---
+
+## 7. Guardian Mobile App API (`routes/api.php`) — DONE
+
+Built and verified API endpoints for the React Native / Expo Guardian Mobile application:
+
+- [x] **Sanctum API Authentication**: Installed `laravel/sanctum`, added `HasApiTokens` to `User` model, migrated `personal_access_tokens`.
+- [x] **Auth Endpoints** (`App\Http\Controllers\Api\AuthController`):
+  - `POST /api/auth/register` — self-registration for guardians, returns token and guardian profile.
+  - `POST /api/auth/login` — credentials verification, returns token, guardian profile, and child profile.
+  - `POST /api/auth/forgot-password` — password reset flow.
+  - `GET /api/me` — returns authenticated guardian and formatted child profile.
+- [x] **Child Medical Profile** (`App\Http\Controllers\Api\ChildApiController`):
+  - `PUT /api/child` — creates/updates child profile with name, age, condition/disability, medical notes, emergency contacts, and updates guardian phone.
+- [x] **Emergency SOS Flow** (`App\Http\Controllers\Api\EmergencyApiController`):
+  - `POST /api/emergencies` — triggers SOS alert with GPS coordinates, loads child profile, and broadcasts `EmergencyRaised` event to Reverb listeners in real time.
+  - `GET /api/emergencies` — lists alert history for the guardian.
+  - `GET /api/emergencies/{emergency}` — checks active emergency status and assigned responder details (name, unit, ETA).
+  - `PATCH /api/emergencies/{emergency}/location` — live GPS coordinate stream while emergency is active.
+  - `POST /api/emergencies/{emergency}/cancel` — false-alarm cancellation flow.
+- [x] **Announcements Inbox** (`App\Http\Controllers\Api\AnnouncementApiController`):
+  - `GET /api/announcements` — lists broadcasts and announcements from the CSN Center with unread tracking.

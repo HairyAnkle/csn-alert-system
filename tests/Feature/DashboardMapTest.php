@@ -6,16 +6,22 @@ use App\Models\ChildProfile;
 use App\Models\Emergency;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Foundation\Testing\WithFaker;
 use Tests\TestCase;
 
 class DashboardMapTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_dashboard_renders_successfully_with_leaflet_map_container(): void
+    public function test_guest_is_redirected_to_login(): void
     {
         $response = $this->get('/');
+        $response->assertRedirect('/login');
+    }
+
+    public function test_dashboard_renders_successfully_with_leaflet_map_container(): void
+    {
+        $user = User::factory()->create();
+        $response = $this->actingAs($user)->get('/');
 
         $response->assertStatus(200);
         $response->assertSee('leaflet.min.css', false);
@@ -52,7 +58,7 @@ class DashboardMapTest extends TestCase
             'reported_at' => now(),
         ]);
 
-        $response = $this->get('/');
+        $response = $this->actingAs($user)->get('/');
 
         $response->assertStatus(200);
         $response->assertViewHas('emergencies');
@@ -93,5 +99,30 @@ class DashboardMapTest extends TestCase
         $this->assertLessThan(14.55, $emergency->lat);
         $this->assertGreaterThan(120.95, $emergency->lng);
         $this->assertLessThan(121.08, $emergency->lng);
+    }
+
+    public function test_dashboard_supplies_monthly_statistics_comparison_for_cards(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/');
+
+        $response->assertStatus(200);
+        $response->assertViewHas('monthlyStats');
+
+        $stats = $response->viewData('monthlyStats');
+        $this->assertIsArray($stats);
+        $this->assertArrayHasKey('incidents', $stats);
+        $this->assertArrayHasKey('children', $stats);
+        $this->assertArrayHasKey('units', $stats);
+        $this->assertArrayHasKey('resolved', $stats);
+
+        $this->assertStringContainsString('total incidents from last month', $stats['incidents']['formatted']);
+        $this->assertStringContainsString('from last month', $stats['children']['formatted']);
+        $this->assertStringContainsString('from last month', $stats['units']['formatted']);
+        $this->assertStringContainsString('from last month', $stats['resolved']['formatted']);
+
+        // Assert view HTML contains the monthly metrics in Alpine state
+        $response->assertSee('total incidents from last month');
     }
 }

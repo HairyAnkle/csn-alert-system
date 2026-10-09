@@ -32,17 +32,19 @@
     {{-- Nav --}}
     <nav class="mt-4 flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label="Main navigation">
         @php
+            $userRole = strtolower(auth()->user()?->roles->first()?->name ?? auth()->user()?->role ?? 'staff');
             $navItems = [
-                ['tab' => 'dashboard', 'label' => 'Dashboard'],
-                ['tab' => 'emergency', 'label' => 'Emergency Center', 'badge' => true],
-                ['tab' => 'children', 'label' => 'Child Profiles'],
-                ['tab' => 'users', 'label' => 'User Management'],
-                ['tab' => 'reports', 'label' => 'Incident Reports'],
-                ['tab' => 'settings', 'label' => 'Settings & Support'],
+                ['tab' => 'dashboard', 'label' => 'Dashboard', 'roles' => ['admin', 'staff', 'responder', 'guardian']],
+                ['tab' => 'emergency', 'label' => 'Emergency Center', 'badge' => true, 'roles' => ['admin', 'staff', 'responder']],
+                ['tab' => 'children', 'label' => 'Child Profiles', 'roles' => ['admin', 'staff', 'guardian', 'responder']],
+                ['tab' => 'users', 'label' => 'User Management', 'roles' => ['admin']],
+                ['tab' => 'reports', 'label' => 'Incident Reports', 'roles' => ['admin', 'staff', 'responder']],
+                ['tab' => 'settings', 'label' => 'Settings & Support', 'roles' => ['admin', 'staff']],
             ];
         @endphp
 
         @foreach ($navItems as $item)
+            @if(!auth()->check() || in_array($userRole, $item['roles']))
             <button
                 type="button"
                 @click="currentTab = '{{ $item['tab'] }}'; sidebarOpen = false"
@@ -78,6 +80,7 @@
                           class="ml-auto flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-critical-500 px-1 text-xs font-bold text-white"></span>
                 @endif
             </button>
+            @endif
         @endforeach
     </nav>
 
@@ -95,9 +98,12 @@
             <span>Manila Time</span>
             <span class="font-mono tabular-nums text-slate-100" x-text="manilaTime"></span>
         </div>
-        <button type="button" class="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 focus-ring">
-            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-            Sign Out
-        </button>
+        <form method="POST" action="{{ route('logout') }}" class="w-full">
+            @csrf
+            <button type="submit" class="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-sm font-medium text-slate-200 hover:bg-slate-700 focus-ring">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+                Sign Out
+            </button>
+        </form>
     </div>
 </aside>

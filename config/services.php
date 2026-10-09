@@ -35,4 +35,14 @@ return [
         ],
     ],
 
+    'carto' => [
+        'key' => env('CARTODB_KEY', env('CARTO_API_KEY')),
+    ],
+
+    'semaphore' => [
+        'api_key' => env('SEMAPHORE_API_KEY'),
+        'sender_name' => env('SEMAPHORE_SENDER_NAME', 'CSN_ALERT'),
+        'default_recipient' => env('SEMAPHORE_DEFAULT_RECIPIENT'),
+    ],
+
 ];

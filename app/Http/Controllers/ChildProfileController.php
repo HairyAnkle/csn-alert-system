@@ -54,7 +54,13 @@ class ChildProfileController extends Controller
             'address' => ['nullable', 'string', 'max:255'],
             'guardian_id' => ['nullable', 'exists:users,id'],
             'guardian_name' => ['nullable', 'string', 'max:255'],
+            'guardian_phone' => ['nullable', 'string', 'max:50'],
             'emergency_contact' => ['nullable', 'string', 'max:100'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:50'],
+            'allergies' => ['nullable', 'string'],
+            'medications' => ['nullable', 'string'],
+            'communication_notes' => ['nullable', 'string'],
             'medical_notes' => ['nullable', 'string'],
             'photo' => ['nullable', 'image', 'max:5120'],
         ]);
@@ -69,6 +75,9 @@ class ChildProfileController extends Controller
             $guardianId = $request->user()->id;
         }
 
+        $emergencyContact = $validated['emergency_contact_phone'] ?? $validated['emergency_contact'] ?? null;
+        $emergencyContactPhone = $validated['emergency_contact_phone'] ?? $validated['emergency_contact'] ?? null;
+
         $child = ChildProfile::create([
             'name' => $validated['name'],
             'age' => $validated['age'] ?? null,
@@ -77,7 +86,13 @@ class ChildProfileController extends Controller
             'address' => $validated['address'] ?? null,
             'guardian_id' => $guardianId,
             'guardian_name' => $validated['guardian_name'] ?? ($guardianId ? User::find($guardianId)?->name : null),
-            'emergency_contact' => $validated['emergency_contact'] ?? null,
+            'guardian_phone' => $validated['guardian_phone'] ?? null,
+            'emergency_contact' => $emergencyContact,
+            'emergency_contact_name' => $validated['emergency_contact_name'] ?? null,
+            'emergency_contact_phone' => $emergencyContactPhone,
+            'allergies' => $validated['allergies'] ?? null,
+            'medications' => $validated['medications'] ?? null,
+            'communication_notes' => $validated['communication_notes'] ?? null,
             'medical_notes' => $validated['medical_notes'] ?? null,
             'photo_path' => $photoPath,
             'created_by' => $request->user()?->id,
@@ -122,7 +137,13 @@ class ChildProfileController extends Controller
             'address' => ['nullable', 'string', 'max:255'],
             'guardian_id' => ['nullable', 'exists:users,id'],
             'guardian_name' => ['nullable', 'string', 'max:255'],
+            'guardian_phone' => ['nullable', 'string', 'max:50'],
             'emergency_contact' => ['nullable', 'string', 'max:100'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:50'],
+            'allergies' => ['nullable', 'string'],
+            'medications' => ['nullable', 'string'],
+            'communication_notes' => ['nullable', 'string'],
             'medical_notes' => ['nullable', 'string'],
             'photo' => ['nullable', 'image', 'max:5120'],
         ]);
@@ -132,6 +153,12 @@ class ChildProfileController extends Controller
                 Storage::disk('public')->delete($child->photo_path);
             }
             $validated['photo_path'] = $request->file('photo')->store('children', 'public');
+        }
+
+        if (isset($validated['emergency_contact_phone']) && ! isset($validated['emergency_contact'])) {
+            $validated['emergency_contact'] = $validated['emergency_contact_phone'];
+        } elseif (isset($validated['emergency_contact']) && ! isset($validated['emergency_contact_phone'])) {
+            $validated['emergency_contact_phone'] = $validated['emergency_contact'];
         }
 
         $child->update($validated);

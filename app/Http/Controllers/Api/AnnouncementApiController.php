@@ -10,17 +10,23 @@ use Illuminate\Http\Request;
 class AnnouncementApiController extends Controller
 {
     /**
-     * List announcements for guardians.
+     * List announcements and broadcasts from CSN Center (Section 7.3).
      */
     public function index(Request $request): JsonResponse
     {
-        $announcements = Announcement::latest()
+        $announcements = Announcement::where(function ($q) {
+            $q->whereNotNull('published_at')->where('published_at', '<=', now())
+                ->orWhereNull('published_at');
+        })
+            ->latest('published_at')
+            ->latest('created_at')
+            ->limit(50)
             ->get()
-            ->map(fn (Announcement $a) => [
-                'id' => $a->id,
-                'title' => $a->title,
-                'body' => $a->body,
-                'created_at' => $a->created_at?->toISOString(),
+            ->map(fn (Announcement $n) => [
+                'id' => $n->id,
+                'title' => $n->title,
+                'body' => $n->body,
+                'created_at' => ($n->published_at ?? $n->created_at)?->toIso8601String(),
             ])
             ->values();
 
@@ -29,4 +35,3 @@ class AnnouncementApiController extends Controller
         ]);
     }
 }
-

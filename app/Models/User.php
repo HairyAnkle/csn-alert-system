@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -15,7 +16,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'role', 'phone', 'status', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'role', 'phone', 'unit', 'status', 'is_active'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -35,7 +36,7 @@ class User extends Authenticatable
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['name', 'email', 'role', 'phone', 'status', 'is_active'])
+            ->logOnly(['name', 'email', 'role', 'phone', 'unit', 'status', 'is_active'])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -46,6 +47,41 @@ class User extends Authenticatable
     public function children(): HasMany
     {
         return $this->hasMany(ChildProfile::class, 'guardian_id');
+    }
+
+    /**
+     * Primary child profile associated with this guardian.
+     *
+     * @return HasOne<ChildProfile, $this>
+     */
+    public function child(): HasOne
+    {
+        return $this->hasOne(ChildProfile::class, 'guardian_id');
+    }
+
+    /**
+     * Check if user has role (checks both Spatie roles and role column).
+     */
+    public function hasRole($roles, string $guard = null): bool
+    {
+        $roleList = collect(is_array($roles) || $roles instanceof \Traversable ? $roles : [$roles])
+            ->flatten()
+            ->map(fn ($r) => is_string($r) ? $r : ($r instanceof \Spatie\Permission\Contracts\Role ? $r->name : (string) $r))
+            ->map('strtolower')
+            ->all();
+
+        $userRole = strtolower((string) ($this->role ?? ''));
+        if ($userRole !== '' && in_array($userRole, $roleList, true)) {
+            return true;
+        }
+
+        try {
+            return $this->roles->contains(function ($role) use ($roleList) {
+                return in_array(strtolower($role->name), $roleList, true);
+            });
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

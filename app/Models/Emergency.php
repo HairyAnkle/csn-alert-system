@@ -29,15 +29,18 @@ class Emergency extends Model
         'urgency',
         'status',
         'child_id',
+        'guardian_id',
         'location',
         'lat',
         'lng',
         'guardian_notes',
         'responder_id',
+        'eta',
         'reported_at',
         'acknowledged_at',
         'dispatched_at',
         'resolved_at',
+        'cancelled_at',
         'incident_summary',
     ];
 
@@ -52,6 +55,7 @@ class Emergency extends Model
         'acknowledged_at' => 'datetime',
         'dispatched_at' => 'datetime',
         'resolved_at' => 'datetime',
+        'cancelled_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -87,6 +91,30 @@ class Emergency extends Model
     public function responder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'responder_id');
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function guardian(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'guardian_id');
+    }
+
+    /**
+     * Scope query to active emergencies.
+     */
+    public function scopeActive($q)
+    {
+        return $q->whereIn('status', ['pending', 'responding']);
+    }
+
+    /**
+     * Whether emergency is in an active status.
+     */
+    public function isActive(): bool
+    {
+        return in_array($this->status, ['pending', 'responding'], true);
     }
 
     /**
@@ -147,15 +175,19 @@ class Emergency extends Model
             'guardianNotes' => $this->guardian_notes ?? 'No additional notes provided.',
             'reportedAt' => $this->reported_at_human,
             'responderId' => $this->responder_id,
+            'eta' => $this->eta,
             'responder' => $this->responder ? [
                 'id' => $this->responder->id,
                 'name' => $this->responder->name,
+                'unit' => $this->responder->unit ?? 'Parañaque PDRRMO Emergency Unit',
                 'role' => $this->responder->roles->first()?->name ?? $this->responder->role ?? 'Responder',
                 'phone' => $this->responder->phone ?? '—',
+                'eta' => $this->eta ?? '8 mins',
             ] : null,
             'acknowledgedAt' => $this->acknowledged_at?->diffForHumans(),
             'dispatchedAt' => $this->dispatched_at?->diffForHumans(),
             'resolvedAt' => $this->resolved_at?->diffForHumans(),
+            'cancelledAt' => $this->cancelled_at?->diffForHumans(),
             'incident_summary' => $this->incident_summary,
             'child' => $this->child ? [
                 'id' => $this->child->id,
@@ -166,9 +198,9 @@ class Emergency extends Model
                 'emergencyContact' => $this->child->emergency_contact ?? '—',
             ] : [
                 'id' => null,
-                'name' => 'Unknown Child',
+                'name' => 'No profile on file',
                 'age' => '—',
-                'condition' => '—',
+                'condition' => 'No condition recorded',
                 'avatarInitials' => '??',
                 'emergencyContact' => '—',
             ],

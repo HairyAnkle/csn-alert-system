@@ -16,7 +16,7 @@ class DashboardController extends Controller
      */
     public function index(): View
     {
-        $emergencies = Emergency::with('child')
+        $emergencies = Emergency::with(['child', 'responder'])
             ->latest('reported_at')
             ->get()
             ->map(fn (Emergency $e) => $e->toFrontendArray())
@@ -101,6 +101,20 @@ class DashboardController extends Controller
         $settings = Setting::allValues();
         $monthlyStats = $this->calculateMonthlyStats();
 
+        $announcements = \App\Models\Announcement::with('creator')
+            ->latest('published_at')
+            ->latest('created_at')
+            ->limit(30)
+            ->get()
+            ->map(fn (\App\Models\Announcement $a) => [
+                'id' => $a->id,
+                'title' => $a->title,
+                'body' => $a->body,
+                'published_at' => ($a->published_at ?? $a->created_at)?->format('M d, Y h:i A') ?? 'Just now',
+                'author' => $a->creator?->name ?? 'CSN Coordination Desk',
+            ])
+            ->values();
+
         return view('layouts.app', [
             'emergencies' => $emergencies,
             'children' => $children,
@@ -111,6 +125,7 @@ class DashboardController extends Controller
             'currentUser' => $currentUser,
             'settings' => $settings,
             'monthlyStats' => $monthlyStats,
+            'announcements' => $announcements,
         ]);
     }
 

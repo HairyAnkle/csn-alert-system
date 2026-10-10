@@ -36,6 +36,7 @@ Route::middleware(['auth', 'prevent_back_history'])->group(function () {
 
     Route::get('/settings', [SettingController::class, 'show'])->name('settings.show');
     Route::patch('/settings', [SettingController::class, 'update'])->name('settings.update');
+    Route::post('/announcements', [\App\Http\Controllers\AnnouncementController::class, 'store'])->name('announcements.store');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

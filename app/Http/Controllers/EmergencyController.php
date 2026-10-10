@@ -38,7 +38,7 @@ class EmergencyController extends Controller
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'child_id' => ['required', 'exists:child_profiles,id'],
+            'child_id' => ['nullable', 'exists:child_profiles,id'],
             'type' => ['required', 'string', 'max:100'],
             'urgency' => ['required', 'in:high,low'],
             'location' => ['required', 'string', 'max:255'],
@@ -46,31 +46,12 @@ class EmergencyController extends Controller
             'lng' => ['nullable', 'numeric'],
             'guardian_notes' => ['nullable', 'string', 'max:1000'],
             'responder_id' => ['nullable', 'exists:users,id'],
+            'eta' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $emergency = Emergency::create([
-            'child_id' => $validated['child_id'],
-            'type' => $validated['type'],
-            'urgency' => $validated['urgency'],
-            'status' => 'pending',
-            'location' => $validated['location'],
-            'lat' => $validated['lat'] ?? null,
-            'lng' => $validated['lng'] ?? null,
-            'guardian_notes' => $validated['guardian_notes'] ?? null,
-            'responder_id' => $validated['responder_id'] ?? null,
-            'reported_at' => now(),
-        ]);
+        $result = app(\App\Actions\RaiseEmergency::class)->execute($validated, $request->user());
 
-        $emergency->load(['child', 'responder']);
-
-        // Broadcast real-time event to Reverb listeners (fail-safe if Reverb daemon is offline)
-        try {
-            EmergencyRaised::dispatch($emergency);
-        } catch (\Throwable $e) {
-            Log::warning('Reverb broadcasting unavailable: '.$e->getMessage());
-        }
-
-        return response()->json($emergency->toFrontendArray(), 201);
+        return response()->json($result['emergency']->toFrontendArray(), 201);
     }
 
     /**
@@ -99,6 +80,7 @@ class EmergencyController extends Controller
 
         $validated = $request->validate([
             'responder_id' => ['nullable', 'exists:users,id'],
+            'eta' => ['nullable', 'string', 'max:50'],
         ]);
 
         $responderId = $validated['responder_id'] ?? $emergency->responder_id;
@@ -107,11 +89,19 @@ class EmergencyController extends Controller
             $responderId = $request->user()->id;
         }
 
-        $emergency->update([
+        $updates = [
             'status' => 'responding',
             'dispatched_at' => now(),
             'responder_id' => $responderId,
-        ]);
+        ];
+
+        if (! empty($validated['eta'])) {
+            $updates['eta'] = $validated['eta'];
+        } elseif (! $emergency->eta) {
+            $updates['eta'] = '8 mins';
+        }
+
+        $emergency->update($updates);
 
         $emergency->load(['child', 'responder']);
 

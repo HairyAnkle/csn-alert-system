@@ -54,7 +54,10 @@
                             <td class="px-4 py-3 text-slate-600" x-text="child.condition"></td>
                             <td class="px-4 py-3 text-xs text-slate-500" x-text="child.address || 'Parañaque City'"></td>
                             <td class="px-4 py-3 text-slate-600" x-text="child.guardian"></td>
-                            <td class="px-4 py-3 font-mono text-xs text-slate-500" x-text="child.contact"></td>
+                            <td class="px-4 py-3 font-mono text-xs text-slate-500">
+                                <p x-text="child.emergency_contact_phone || child.contact || '—'"></p>
+                                <p class="text-[10px] font-sans text-slate-400" x-show="child.emergency_contact_name && child.emergency_contact_name !== 'Primary Contact'" x-text="child.emergency_contact_name"></p>
+                            </td>
                             <td class="px-4 py-3 text-right">
                                 <button type="button" @click="viewChildProfile(child.id)"
                                         class="min-h-[44px] rounded-lg px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50 focus-ring">
@@ -124,16 +127,56 @@
                             <p class="mt-1 text-sm text-slate-700" x-text="activeChild.address || 'Parañaque City'"></p>
                         </div>
 
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Parent / Registered Guardian</p>
-                            <p class="mt-1 text-sm text-slate-700" x-text="activeChild.guardian"></p>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Parent / Guardian</p>
+                                <p class="mt-1 text-sm text-slate-700" x-text="activeChild.guardian"></p>
+                                <p class="text-xs text-slate-500 font-mono" x-show="activeChild.guardian_phone" x-text="activeChild.guardian_phone"></p>
+                            </div>
+                            <div>
+                                <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Emergency Contact</p>
+                                <p class="mt-1 font-mono text-sm text-slate-700" x-text="activeChild.emergency_contact_phone || activeChild.contact || '—'"></p>
+                                <p class="text-xs text-slate-500" x-show="activeChild.emergency_contact_name && activeChild.emergency_contact_name !== 'Primary Contact'" x-text="activeChild.emergency_contact_name"></p>
+                            </div>
                         </div>
 
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-400">Emergency Contact</p>
-                            <p class="mt-1 font-mono text-sm text-slate-700" x-text="activeChild.contact"></p>
+                        {{-- Decrypted Allergies Card --}}
+                        <div class="rounded-xl border border-rose-200 bg-rose-50/70 p-4">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <p class="text-xs font-bold text-rose-800 flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5 text-rose-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                    Allergies (Decrypted)
+                                </p>
+                                <span class="text-[10px] text-rose-700/80 font-mono">DPA Protected</span>
+                            </div>
+                            <p class="text-sm text-slate-700 whitespace-pre-line" x-text="activeChild.allergies || 'None reported.'"></p>
                         </div>
 
+                        {{-- Decrypted Current Medications Card --}}
+                        <div class="rounded-xl border border-sky-200 bg-sky-50/70 p-4">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <p class="text-xs font-bold text-sky-800 flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5 text-sky-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                    Current Medications (Decrypted)
+                                </p>
+                                <span class="text-[10px] text-sky-700/80 font-mono">DPA Protected</span>
+                            </div>
+                            <p class="text-sm text-slate-700 whitespace-pre-line" x-text="activeChild.medications || 'None recorded.'"></p>
+                        </div>
+
+                        {{-- Decrypted Communication Notes Card --}}
+                        <div class="rounded-xl border border-purple-200 bg-purple-50/70 p-4">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <p class="text-xs font-bold text-purple-800 flex items-center gap-1.5">
+                                    <svg class="h-3.5 w-3.5 text-purple-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                                    Communication & Behavioral Notes (Decrypted)
+                                </p>
+                                <span class="text-[10px] text-purple-700/80 font-mono">DPA Protected</span>
+                            </div>
+                            <p class="text-sm text-slate-700 whitespace-pre-line" x-text="activeChild.communication_notes || 'No communication preferences recorded.'"></p>
+                        </div>
+
+                        {{-- Primary Clinical Notes --}}
                         <div class="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
                             <div class="flex items-center justify-between mb-2">
                                 <p class="text-xs font-bold text-amber-800 flex items-center gap-1.5">
@@ -218,8 +261,19 @@
                     </div>
 
                     <div>
-                        <label class="mb-1 block text-sm font-medium text-slate-600">Emergency Contact</label>
-                        <input type="text" name="emergency_contact" placeholder="e.g. +63 918 333 4455" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm font-mono focus-ring">
+                        <label class="mb-1 block text-sm font-medium text-slate-600">Guardian Phone</label>
+                        <input type="text" name="guardian_phone" placeholder="e.g. +63 917 123 4567" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm font-mono focus-ring">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-slate-600">Emergency Contact Name</label>
+                            <input type="text" name="emergency_contact_name" placeholder="e.g. Dr. Maria Santos (Pediatrician)" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                        </div>
+                        <div>
+                            <label class="mb-1 block text-sm font-medium text-slate-600">Emergency Contact Phone</label>
+                            <input type="text" name="emergency_contact_phone" placeholder="e.g. +63 918 333 4455" class="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 text-sm font-mono focus-ring">
+                        </div>
                     </div>
 
                     <div>
@@ -229,10 +283,34 @@
 
                     <div>
                         <label class="mb-1 block text-sm font-medium text-slate-600">
+                            Known Allergies
+                            <span class="text-xs text-slate-400 font-normal">(Encrypted under RA 10173)</span>
+                        </label>
+                        <textarea name="allergies" rows="2" placeholder="e.g. Penicillin, Peanuts, Latex, Bee stings..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-600">
+                            Current Medications & Dosages
+                            <span class="text-xs text-slate-400 font-normal">(Encrypted under RA 10173)</span>
+                        </label>
+                        <textarea name="medications" rows="2" placeholder="e.g. Levetiracetam 250mg BID, Melatonin 3mg QHS..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-600">
+                            Communication & Behavioral Notes
+                            <span class="text-xs text-slate-400 font-normal">(Encrypted under RA 10173)</span>
+                        </label>
+                        <textarea name="communication_notes" rows="2" placeholder="e.g. Non-verbal, uses PECS cards, sensitive to loud sirens, respond to calm voice..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"></textarea>
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-sm font-medium text-slate-600">
                             Primary Medical Notes
                             <span class="text-xs text-slate-400 font-normal">(Encrypted under RA 10173)</span>
                         </label>
-                        <textarea name="medical_notes" rows="3" placeholder="Sensory triggers, medications, non-verbal preferences, calming protocols..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"></textarea>
+                        <textarea name="medical_notes" rows="2" placeholder="Additional clinical history, physician notes, emergency protocols..." class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"></textarea>
                     </div>
                 </div>
 

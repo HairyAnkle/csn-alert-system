@@ -109,6 +109,69 @@
             </div>
         </div>
 
+        {{-- Card: Mobile Announcement Composer (Broadcast to Guardians) --}}
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 space-y-4">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <h2 class="text-base font-bold text-slate-800">Community Announcements & Mobile Broadcasts</h2>
+                        <span class="rounded bg-brand-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-brand-700 ring-1 ring-brand-200">
+                            Mobile App Inbox
+                        </span>
+                    </div>
+                    <p class="text-xs text-slate-500">Publish advisories, weather warnings, or center bulletins directly to guardian mobile app inboxes.</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {{-- Form --}}
+                <form @submit.prevent="publishAnnouncement()" class="space-y-3.5">
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-700 uppercase tracking-wider">Announcement Title <span class="text-rose-500">*</span></label>
+                        <input type="text" x-model="newAnnouncement.title" required placeholder="e.g. Typhoon Advisory: Heavy Rain Protocol"
+                               class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                    </div>
+
+                    <div>
+                        <label class="mb-1 block text-xs font-semibold text-slate-700 uppercase tracking-wider">Broadcast Content / Body <span class="text-rose-500">*</span></label>
+                        <textarea x-model="newAnnouncement.body" rows="4" required placeholder="Type the message to be received by parents and guardians in the CSN Mobile App..."
+                                  class="w-full rounded-lg border border-slate-300 p-3 text-sm focus-ring"></textarea>
+                    </div>
+
+                    <div class="pt-1">
+                        <button type="submit" :disabled="isPublishingAnnouncement"
+                                class="inline-flex min-h-[42px] w-full items-center justify-center gap-2 rounded-lg bg-brand-700 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 focus-ring disabled:opacity-50">
+                            <svg x-show="isPublishingAnnouncement" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                            <svg x-show="!isPublishingAnnouncement" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                            </svg>
+                            <span x-text="isPublishingAnnouncement ? 'Broadcasting...' : 'Publish to Guardian Mobile Inbox'"></span>
+                        </button>
+                    </div>
+                </form>
+
+                {{-- Recent broadcasts list --}}
+                <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 flex flex-col">
+                    <p class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Recent Broadcasts (<span x-text="announcements.length"></span>)</p>
+                    <div class="flex-1 overflow-y-auto max-h-60 space-y-2 pr-1">
+                        <template x-for="item in announcements" :key="item.id">
+                            <div class="rounded-lg border border-slate-200 bg-white p-3 text-xs space-y-1 shadow-2xl-none">
+                                <div class="flex items-center justify-between">
+                                    <span class="font-bold text-slate-800" x-text="item.title"></span>
+                                    <span class="text-[10px] text-slate-400 font-mono" x-text="item.published_at"></span>
+                                </div>
+                                <p class="text-slate-600 line-clamp-2" x-text="item.body"></p>
+                                <p class="text-[10px] text-brand-700 font-medium" x-text="'Posted by: ' + (item.author || 'CSN Staff')"></p>
+                            </div>
+                        </template>
+                        <div x-show="announcements.length === 0" class="py-8 text-center text-xs text-slate-400">
+                            No announcements published yet. Write a message to notify guardians.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- Card 3: Support, Help Desk & Operational Guide --}}
         <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 space-y-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">

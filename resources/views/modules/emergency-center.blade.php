@@ -12,6 +12,7 @@
                     ['key' => 'pending', 'label' => 'Pending'],
                     ['key' => 'responding', 'label' => 'Responding'],
                     ['key' => 'resolved', 'label' => 'Resolved'],
+                    ['key' => 'cancelled', 'label' => 'Cancelled'],
                 ];
             @endphp
             @foreach ($filters as $f)
@@ -48,7 +49,7 @@
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <template x-for="e in filteredEmergencies" :key="e.id">
             <div class="rounded-xl border bg-white p-5 shadow-sm transition"
-                 :class="e.urgency === 'high' && e.status !== 'resolved' ? 'border-critical-500/40 ring-1 ring-critical-500/20' : 'border-slate-200'">
+                 :class="e.urgency === 'high' && e.status !== 'resolved' && e.status !== 'cancelled' ? 'border-critical-500/40 ring-1 ring-critical-500/20' : 'border-slate-200'">
 
                 {{-- Header: type badge + urgency --}}
                 <div class="flex items-start justify-between gap-2">
@@ -64,16 +65,17 @@
                           :class="{
                               'bg-amber-500/10 text-amber-600': e.status === 'pending',
                               'bg-sky-500/10 text-sky-600': e.status === 'responding',
-                              'bg-emerald-500/10 text-emerald-600': e.status === 'resolved'
+                              'bg-emerald-500/10 text-emerald-600': e.status === 'resolved',
+                              'bg-slate-500/10 text-slate-500': e.status === 'cancelled'
                           }" x-text="e.status"></span>
                 </div>
 
                 {{-- Child summary --}}
                 <div class="mt-4 flex items-start gap-3">
-                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-800" x-text="e.child.avatarInitials"></div>
+                    <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-bold text-brand-800" x-text="e.child?.avatarInitials || '??'"></div>
                     <div class="min-w-0">
-                        <p class="font-semibold text-slate-800" x-text="e.child.name"></p>
-                        <p class="text-sm text-slate-500" x-text="'Age ' + e.child.age + ' · ' + e.child.condition"></p>
+                        <p class="font-semibold text-slate-800" x-text="e.child?.name || 'No profile on file'"></p>
+                        <p class="text-sm text-slate-500" x-text="e.child ? ('Age ' + (e.child.age || '—') + ' · ' + (e.child.condition || 'General')) : 'Direct SOS alert (no profile on file)'"></p>
                         <p class="text-xs text-slate-400" x-text="'Reported ' + e.reportedAt"></p>
                     </div>
                 </div>
@@ -100,11 +102,11 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
                         <div>
-                            <p class="font-semibold text-sky-900" x-text="'Assigned Unit: ' + (e.responder?.name || 'Responder')"></p>
-                            <p class="text-sky-700 font-mono" x-text="e.responder?.phone ? 'Phone: ' + e.responder?.phone : 'Direct unit'"></p>
+                            <p class="font-semibold text-sky-900" x-text="'Assigned Unit: ' + (e.responder?.name || 'Responder') + (e.responder?.unit ? ' (' + e.responder.unit + ')' : '')"></p>
+                            <p class="text-sky-700 font-mono" x-text="(e.responder?.phone ? 'Phone: ' + e.responder?.phone : 'Direct unit') + (e.eta ? ' · ETA: ' + e.eta : '')"></p>
                         </div>
                     </div>
-                    <span class="rounded bg-sky-200/60 px-2 py-0.5 font-medium text-sky-800" x-text="e.dispatchedAt ? 'Dispatched ' + e.dispatchedAt : 'Assigned'"></span>
+                    <span class="rounded bg-sky-200/60 px-2 py-0.5 font-medium text-sky-800" x-text="e.dispatchedAt ? 'Dispatched ' + e.dispatchedAt : (e.eta ? 'ETA ' + e.eta : 'Assigned')"></span>
                 </div>
 
                 {{-- Actions --}}
@@ -114,16 +116,18 @@
                             :class="e.status === 'pending' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-400'">
                         Acknowledge Alert
                     </button>
-                    <button type="button" @click="dispatch(e.id)" :disabled="e.status === 'resolved'"
+                    <button type="button" @click="openDispatchModal(e)" :disabled="e.status === 'resolved' || e.status === 'cancelled'"
                             class="min-h-[44px] flex-1 rounded-lg px-3 text-sm font-semibold transition focus-ring disabled:cursor-not-allowed disabled:opacity-40"
-                            :class="e.status !== 'resolved' ? 'bg-brand-700 text-white hover:bg-brand-800' : 'bg-slate-100 text-slate-400'">
-                        Dispatch Responder
+                            :class="e.status !== 'resolved' && e.status !== 'cancelled' ? 'bg-brand-700 text-white hover:bg-brand-800' : 'bg-slate-100 text-slate-400'">
+                        <span x-show="e.responder">Reassign Unit</span>
+                        <span x-show="!e.responder">Dispatch Responder</span>
                     </button>
-                    <button type="button" @click="resolve(e.id)" :disabled="e.status === 'resolved'"
+                    <button type="button" @click="resolve(e.id)" :disabled="e.status === 'resolved' || e.status === 'cancelled'"
                             class="min-h-[44px] flex-1 rounded-lg px-3 text-sm font-semibold transition focus-ring disabled:cursor-not-allowed disabled:opacity-40"
-                            :class="e.status !== 'resolved' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-400'">
-                        <span x-show="e.status !== 'resolved'">Mark Resolved</span>
+                            :class="e.status !== 'resolved' && e.status !== 'cancelled' ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-100 text-slate-400'">
+                        <span x-show="e.status !== 'resolved' && e.status !== 'cancelled'">Mark Resolved</span>
                         <span x-show="e.status === 'resolved'">Resolved</span>
+                        <span x-show="e.status === 'cancelled'">Cancelled</span>
                     </button>
                 </div>
             </div>
@@ -215,6 +219,67 @@
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    {{-- Dispatch Responder Modal --}}
+    <div x-show="activeModal === 'dispatchResponder'" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" @click="activeModal = null"></div>
+
+        <div class="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-slate-900/10">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h3 class="text-lg font-bold text-slate-800">Dispatch Emergency Responder</h3>
+                    <p class="text-xs text-slate-500">Assign a responder unit and specify estimated arrival time.</p>
+                </div>
+                <button type="button" @click="activeModal = null" class="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-ring">
+                    <svg class="h-5 w-5" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <template x-if="dispatchTarget">
+                <div class="mt-4 space-y-4">
+                    {{-- Emergency context summary --}}
+                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 text-xs text-slate-700 space-y-1">
+                        <div class="flex items-center justify-between">
+                            <span class="font-bold text-slate-900" x-text="'Alert #' + dispatchTarget.id + ' · ' + dispatchTarget.type"></span>
+                            <span class="rounded bg-rose-100 px-2 py-0.5 font-semibold text-rose-700 uppercase tracking-wide" x-text="dispatchTarget.urgency + ' Urgency'"></span>
+                        </div>
+                        <p class="text-slate-600" x-text="'Target: ' + (dispatchTarget.child?.name || 'No profile on file') + ' (' + dispatchTarget.location + ')'"></p>
+                    </div>
+
+                    <form @submit.prevent="submitDispatch()" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Select Responder Unit <span class="text-red-500">*</span></label>
+                            <select x-model="dispatchForm.responder_id" required class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring bg-white">
+                                <option value="">-- Select active responder --</option>
+                                <template x-for="u in users.filter(usr => (usr.role || '').toLowerCase() === 'responder')" :key="u.id">
+                                    <option :value="u.id" x-text="u.name + (u.unit ? ' (' + u.unit + ')' : '') + (u.phone ? ' - ' + u.phone : '')"></option>
+                                </template>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Estimated Time of Arrival (ETA) <span class="text-red-500">*</span></label>
+                            <input type="text" x-model="dispatchForm.eta" required placeholder="e.g. 5 mins, 8 mins, 15 mins" class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
+                            <div class="mt-2 flex flex-wrap gap-1.5">
+                                <template x-for="preset in ['3 mins', '5 mins', '8 mins', '10 mins', '15 mins']" :key="preset">
+                                    <button type="button" @click="dispatchForm.eta = preset" class="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition" :class="dispatchForm.eta === preset ? 'border-brand-600 bg-brand-50 text-brand-700 font-semibold' : ''" x-text="preset"></button>
+                                </template>
+                            </div>
+                            <p class="mt-1 text-[11px] text-slate-400">This ETA is sent directly to the guardian's mobile app screen.</p>
+                        </div>
+
+                        <div class="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+                            <button type="button" @click="activeModal = null" class="min-h-[42px] rounded-lg px-4 text-sm font-medium text-slate-600 hover:bg-slate-100 focus-ring">Cancel</button>
+                            <button type="submit" :disabled="isSubmittingDispatch" class="min-h-[42px] inline-flex items-center gap-2 rounded-lg bg-brand-700 px-5 text-sm font-semibold text-white shadow-sm hover:bg-brand-800 focus-ring disabled:opacity-50">
+                                <span x-show="!isSubmittingDispatch">Confirm Dispatch & Notify</span>
+                                <span x-show="isSubmittingDispatch">Dispatching...</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </template>
         </div>
     </div>
 </div>

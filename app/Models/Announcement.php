@@ -13,7 +13,12 @@ class Announcement extends Model
     protected $fillable = [
         'title',
         'body',
+        'published_at',
         'created_by',
+    ];
+
+    protected $casts = [
+        'published_at' => 'datetime',
     ];
 
     public function creator(): BelongsTo

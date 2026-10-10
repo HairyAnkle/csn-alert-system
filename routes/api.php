@@ -1,38 +1,36 @@
 <?php
 
-use App\Http\Controllers\Api\AnnouncementApiController;
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\ChildApiController;
-use App\Http\Controllers\Api\EmergencyApiController;
+use App\Http\Controllers\Api\{AuthController, ChildController, EmergencyController, AnnouncementController};
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Mobile Guardian API Routes
+| Mobile Guardian API Routes (Section 7.2)
 |--------------------------------------------------------------------------
 |
 | Handlers for Parañaque CSN Guardian Mobile App.
-| Bearer token authentication via Laravel Sanctum.
+| Bearer token authentication via Laravel Sanctum & role:guardian check.
 |
 */
 
-// Public authentication routes
 Route::prefix('auth')->group(function () {
-    Route::post('/login', [AuthController::class, 'login']);
-    Route::post('/register', [AuthController::class, 'register']);
-    Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+    Route::post('login',           [AuthController::class, 'login'])->middleware('throttle:10,1');
+    Route::post('register',        [AuthController::class, 'register'])->middleware('throttle:10,1');
+    Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
+    Route::post('google',          [AuthController::class, 'google']);   // later
 });
 
-// Protected routes (Sanctum Bearer token)
-Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/me', [AuthController::class, 'me']);
-    Route::put('/child', [ChildApiController::class, 'update']);
+Route::middleware(['auth:sanctum', 'role:guardian'])->group(function () {
+    Route::post('auth/logout', [AuthController::class, 'logout']);
+    Route::get('me',           [AuthController::class, 'me']);
 
-    Route::get('/emergencies', [EmergencyApiController::class, 'index']);
-    Route::post('/emergencies', [EmergencyApiController::class, 'store']);
-    Route::get('/emergencies/{emergency}', [EmergencyApiController::class, 'show']);
-    Route::patch('/emergencies/{emergency}/location', [EmergencyApiController::class, 'updateLocation']);
-    Route::post('/emergencies/{emergency}/cancel', [EmergencyApiController::class, 'cancel']);
+    Route::put('child', [ChildController::class, 'update']);
 
-    Route::get('/announcements', [AnnouncementApiController::class, 'index']);
+    Route::get('emergencies',                      [EmergencyController::class, 'index']);
+    Route::post('emergencies',                     [EmergencyController::class, 'store'])->middleware('throttle:6,1');
+    Route::get('emergencies/{emergency}',          [EmergencyController::class, 'show']);
+    Route::patch('emergencies/{emergency}/location', [EmergencyController::class, 'location'])->middleware('throttle:60,1');
+    Route::post('emergencies/{emergency}/cancel',  [EmergencyController::class, 'cancel']);
+
+    Route::get('announcements', [AnnouncementController::class, 'index']);
 });

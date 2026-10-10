@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\EmergencyCancelled;
+use App\Events\EmergencyLocationUpdated;
 use App\Events\EmergencyRaised;
 use App\Http\Controllers\Controller;
-use App\Models\ChildProfile;
+use App\Http\Resources\EmergencyResource;
 use App\Models\Emergency;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class EmergencyApiController extends Controller
 {
@@ -18,17 +21,15 @@ class EmergencyApiController extends Controller
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
-        $childIds = $user->children()->pluck('id');
 
-        $emergencies = Emergency::with('responder')
-            ->whereIn('child_id', $childIds)
+        $emergencies = Emergency::where('guardian_id', $user->id)
+            ->with('responder')
             ->latest('reported_at')
-            ->get()
-            ->map(fn (Emergency $e) => $this->formatForMobile($e))
-            ->values();
+            ->limit(50)
+            ->get();
 
         return response()->json([
-            'emergencies' => $emergencies,
+            'emergencies' => EmergencyResource::collection($emergencies)->resolve(),
         ]);
     }
 
@@ -37,58 +38,18 @@ class EmergencyApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $validated = $request->validate([
-            'type' => ['nullable', 'string', 'max:100'],
-            'lat' => ['nullable', 'numeric'],
-            'lng' => ['nullable', 'numeric'],
+        $d = $request->validate([
+            'type' => ['required', Rule::in(['medical_crisis', 'seizure_sensory', 'wandering', 'fire'])],
+            'lat'  => 'nullable|numeric|between:-90,90',
+            'lng'  => 'nullable|numeric|between:-180,180',
         ]);
 
         $user = $request->user();
-        $child = $user->children()->first();
-
-        // If guardian has not created a child profile yet, create an initial placeholder
-        if (! $child) {
-            $child = ChildProfile::create([
-                'name' => "Child of {$user->name}",
-                'condition' => 'Special Needs',
-                'guardian_id' => $user->id,
-                'guardian_name' => $user->name,
-                'emergency_contact' => $user->phone ?? '911',
-                'created_by' => $user->id,
-            ]);
-        }
-
-        $lat = isset($validated['lat']) ? (float) $validated['lat'] : null;
-        $lng = isset($validated['lng']) ? (float) $validated['lng'] : null;
-
-        $locationText = ($lat && $lng)
-            ? sprintf('Live GPS (%.5f, %.5f)', $lat, $lng)
-            : 'Live GPS (Pending)';
-
-        $emergency = Emergency::create([
-            'child_id' => $child->id,
-            'type' => $validated['type'] ?? 'medical_crisis',
-            'urgency' => 'high',
-            'status' => 'pending',
-            'location' => $locationText,
-            'lat' => $lat,
-            'lng' => $lng,
-            'guardian_notes' => 'Triggered via Guardian Mobile App SOS button',
-            'reported_at' => now(),
-        ]);
-
-        $emergency->load(['child', 'responder']);
-
-        // Broadcast to Reverb for real-time web dashboard update
-        try {
-            EmergencyRaised::dispatch($emergency);
-        } catch (\Throwable $e) {
-            Log::warning('Reverb broadcasting failed during mobile SOS alert: '.$e->getMessage());
-        }
+        $result = app(\App\Actions\RaiseEmergency::class)->execute($d, $user);
 
         return response()->json([
-            'emergency' => $this->formatForMobile($emergency),
-        ], 201);
+            'emergency' => (new EmergencyResource($result['emergency']))->resolve(),
+        ], $result['was_existing'] ? 200 : 201);
     }
 
     /**
@@ -96,40 +57,45 @@ class EmergencyApiController extends Controller
      */
     public function show(Request $request, Emergency $emergency): JsonResponse
     {
-        $this->authorizeAccess($request->user(), $emergency);
+        $this->authorize('view', $emergency);
 
         $emergency->load(['child', 'responder']);
 
         return response()->json([
-            'emergency' => $this->formatForMobile($emergency),
+            'emergency' => (new EmergencyResource($emergency))->resolve(),
         ]);
     }
 
     /**
      * Update live coordinates while emergency is active.
      */
-    public function updateLocation(Request $request, Emergency $emergency): JsonResponse
+    public function location(Request $request, Emergency $emergency): JsonResponse
     {
-        $this->authorizeAccess($request->user(), $emergency);
+        $this->authorize('update', $emergency);
 
-        $validated = $request->validate([
-            'lat' => ['required', 'numeric'],
-            'lng' => ['required', 'numeric'],
+        abort_unless($emergency->isActive(), 409, 'This alert is no longer active.');
+
+        $data = $request->validate([
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
         ]);
 
-        $lat = (float) $validated['lat'];
-        $lng = (float) $validated['lng'];
-
         $emergency->update([
-            'lat' => $lat,
-            'lng' => $lng,
-            'location' => sprintf('Live GPS (%.5f, %.5f)', $lat, $lng),
+            'lat' => (float) $data['lat'],
+            'lng' => (float) $data['lng'],
+            'location' => sprintf('Live GPS (%.5f, %.5f)', $data['lat'], $data['lng']),
         ]);
 
         $emergency->load(['child', 'responder']);
 
+        try {
+            EmergencyLocationUpdated::dispatch($emergency);
+        } catch (\Throwable $e) {
+            Log::warning('Reverb location broadcasting failed: '.$e->getMessage());
+        }
+
         return response()->json([
-            'emergency' => $this->formatForMobile($emergency),
+            'emergency' => (new EmergencyResource($emergency))->resolve(),
         ]);
     }
 
@@ -138,63 +104,25 @@ class EmergencyApiController extends Controller
      */
     public function cancel(Request $request, Emergency $emergency): JsonResponse
     {
-        $this->authorizeAccess($request->user(), $emergency);
+        $this->authorize('cancel', $emergency);
+
+        abort_unless($emergency->isActive(), 409, 'This alert is already resolved or cancelled.');
 
         $emergency->update([
             'status' => 'cancelled',
+            'cancelled_at' => now(),
         ]);
 
         $emergency->load(['child', 'responder']);
 
+        try {
+            EmergencyCancelled::dispatch($emergency);
+        } catch (\Throwable $e) {
+            Log::warning('Reverb cancellation broadcasting failed: '.$e->getMessage());
+        }
+
         return response()->json([
-            'emergency' => $this->formatForMobile($emergency),
+            'emergency' => (new EmergencyResource($emergency))->resolve(),
         ]);
     }
-
-    /**
-     * Format emergency model for mobile contract.
-     *
-     * @return array<string, mixed>
-     */
-    public function formatForMobile(Emergency $e): array
-    {
-        $responder = null;
-        if ($e->responder) {
-            $responder = [
-                'id' => $e->responder->id,
-                'name' => $e->responder->name,
-                'unit' => $e->responder->name,
-                'eta' => '5-10 mins',
-                'phone' => $e->responder->phone ?? '',
-            ];
-        }
-
-        return [
-            'id' => $e->id,
-            'type' => $e->type,
-            'status' => $e->status,
-            'location' => $e->location,
-            'lat' => $e->lat !== null ? (float) $e->lat : null,
-            'lng' => $e->lng !== null ? (float) $e->lng : null,
-            'responder' => $responder,
-            'reported_at' => $e->reported_at?->toISOString() ?? $e->created_at?->toISOString(),
-        ];
-    }
-
-    /**
-     * Ensure guardian has permission to view/manage this emergency.
-     */
-    protected function authorizeAccess($user, Emergency $emergency): void
-    {
-        // Staff/Admin/Responder can view any emergency
-        if (in_array(strtolower((string) $user->role), ['admin', 'staff', 'responder'], true)) {
-            return;
-        }
-
-        $guardianChildIds = $user->children()->pluck('id')->all();
-        if (! in_array($emergency->child_id, $guardianChildIds, true)) {
-            abort(403, 'Unauthorized access to this emergency record.');
-        }
-    }
 }
-

@@ -183,21 +183,23 @@ Route::patch('/settings', [SettingController::class, 'update']);
 
 ## 7. Guardian Mobile App API (`routes/api.php`) — DONE
 
-Built and verified API endpoints for the React Native / Expo Guardian Mobile application:
+Built and verified API endpoints, resources, policies, and database schema for the React Native / Expo Guardian Mobile application:
 
 - [x] **Sanctum API Authentication**: Installed `laravel/sanctum`, added `HasApiTokens` to `User` model, migrated `personal_access_tokens`.
-- [x] **Auth Endpoints** (`App\Http\Controllers\Api\AuthController`):
-  - `POST /api/auth/register` — self-registration for guardians, returns token and guardian profile.
-  - `POST /api/auth/login` — credentials verification, returns token, guardian profile, and child profile.
-  - `POST /api/auth/forgot-password` — password reset flow.
-  - `GET /api/me` — returns authenticated guardian and formatted child profile.
-- [x] **Child Medical Profile** (`App\Http\Controllers\Api\ChildApiController`):
-  - `PUT /api/child` — creates/updates child profile with name, age, condition/disability, medical notes, emergency contacts, and updates guardian phone.
-- [x] **Emergency SOS Flow** (`App\Http\Controllers\Api\EmergencyApiController`):
-  - `POST /api/emergencies` — triggers SOS alert with GPS coordinates, loads child profile, and broadcasts `EmergencyRaised` event to Reverb listeners in real time.
-  - `GET /api/emergencies` — lists alert history for the guardian.
-  - `GET /api/emergencies/{emergency}` — checks active emergency status and assigned responder details (name, unit, ETA).
-  - `PATCH /api/emergencies/{emergency}/location` — live GPS coordinate stream while emergency is active.
-  - `POST /api/emergencies/{emergency}/cancel` — false-alarm cancellation flow.
-- [x] **Announcements Inbox** (`App\Http\Controllers\Api\AnnouncementApiController`):
-  - `GET /api/announcements` — lists broadcasts and announcements from the CSN Center with unread tracking.
+- [x] **7.1 Database Schema & Models**:
+  - `users`: added `unit` (nullable string for responder units) and `phone`. Added `child(): HasOne` relation to `User`.
+  - `child_profiles`: added `allergies` (encrypted), `medications` (encrypted), `communication_notes` (encrypted), `guardian_phone`, `emergency_contact_name`, `emergency_contact_phone`.
+  - `emergencies`: added `guardian_id` (foreign key to `users`), `eta`, `cancelled_at` timestamp. Made `child_id` nullable (safety rule: never block an emergency alert even if child profile hasn't been created yet). Added `guardian(): BelongsTo`, `scopeActive()`, and `isActive(): bool` methods.
+  - `announcements`: created `announcements` table (id, title, body, published_at, created_by, timestamps).
+- [x] **7.2 Routes & Middleware Configuration (`routes/api.php`)**:
+  - Rate limiting on public auth routes: `throttle:10,1` on login/register, `throttle:5,1` on forgot-password.
+  - Rate limiting on active alert streams: `throttle:6,1` on emergency triggers, `throttle:60,1` on location stream.
+  - Protected group with `['auth:sanctum', 'role:guardian']`.
+- [x] **7.3 API Resources & Endpoint Specifications**:
+  - `ChildResource`: maps `condition` to `disability`, formats encrypted medical details.
+  - `EmergencyResource`: unwrapped `{emergency: ...}` structure with responder unit, ETA, status, and UTC reported_at.
+  - `EmergencyPolicy`: restricts view, update (location stream), and cancel actions strictly to the owning guardian (`$user->id === $emergency->guardian_id`).
+  - `Double-tap protection`: `POST /api/emergencies` returns existing active alert if already open instead of creating duplicates.
+  - `State validation`: `PATCH /api/emergencies/{id}/location` and `POST /api/emergencies/{id}/cancel` return 409 Conflict if alert is no longer active.
+  - `Broadcasting`: dispatches `EmergencyRaised`, `EmergencyLocationUpdated`, and `EmergencyCancelled` to Reverb private channel for live dashboard updates.
+  - `Privacy on Password Reset`: returns identical confirmation message regardless of email existence to prevent user enumeration.

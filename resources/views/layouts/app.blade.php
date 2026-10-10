@@ -107,10 +107,26 @@
                 children: @json($children ?? []),
                 users: @json($users ?? []),
                 incidents: @json($incidents ?? []),
+                announcements: @json($announcements ?? []),
 
                 // ---- current signed-in admin (populate from auth()->user()) ----
                 currentUser: @json($currentUser ?? ['name' => '', 'role' => '']),
                 settings: @json($settings ?? ['sound_on_high' => true, 'sound_on_low' => true]),
+
+                // ---- dispatch modal state ----
+                dispatchTarget: null,
+                dispatchForm: {
+                    responder_id: '',
+                    eta: '8 mins',
+                },
+                isSubmittingDispatch: false,
+
+                // ---- announcement composer state ----
+                newAnnouncement: {
+                    title: '',
+                    body: '',
+                },
+                isPublishingAnnouncement: false,
 
                 // ---- monthly statistics comparisons ----
                 monthlyStats: Object.assign({
@@ -149,6 +165,34 @@
                                         Object.assign(this.emergencies[existingIndex], e.emergency);
                                     }
                                     this.playAlertSound(e.emergency.urgency);
+                                }
+                            })
+                            .listen('EmergencyCancelled', (e) => {
+                                if (e && e.emergency) {
+                                    const existingIndex = this.emergencies.findIndex(item => item.id === e.emergency.id);
+                                    if (existingIndex !== -1) {
+                                        Object.assign(this.emergencies[existingIndex], e.emergency);
+                                    }
+                                }
+                            })
+                            .listen('EmergencyLocationUpdated', (e) => {
+                                const targetId = e?.emergency?.id || e?.id;
+                                if (targetId) {
+                                    const existing = this.emergencies.find(item => item.id === targetId);
+                                    if (existing) {
+                                        if (e.emergency) {
+                                            Object.assign(existing, e.emergency);
+                                        } else {
+                                            if (e.lat !== undefined) existing.lat = e.lat;
+                                            if (e.lng !== undefined) existing.lng = e.lng;
+                                            if (e.location) existing.location = e.location;
+                                            if (e.lat !== null && e.lng !== null) {
+                                                const latDir = e.lat >= 0 ? 'N' : 'S';
+                                                const lngDir = e.lng >= 0 ? 'E' : 'W';
+                                                existing.coords = `${Math.abs(e.lat).toFixed(4)}° ${latDir}, ${Math.abs(e.lng).toFixed(4)}° ${lngDir}`;
+                                            }
+                                        }
+                                    }
                                 }
                             });
                     }
@@ -228,9 +272,56 @@
                     }
                 },
 
-                async dispatch(id, responderId = null) {
+                openDispatchModal(emergency) {
+                    this.dispatchTarget = emergency;
+                    const responders = this.users.filter(u => (u.role || '').toLowerCase() === 'responder');
+                    this.dispatchForm = {
+                        responder_id: emergency.responderId || (responders.length > 0 ? responders[0].id : ''),
+                        eta: emergency.eta || '8 mins',
+                    };
+                    this.activeModal = 'dispatchResponder';
+                },
+
+                async submitDispatch() {
+                    if (!this.dispatchTarget) return;
+                    this.isSubmittingDispatch = true;
                     try {
-                        const payload = responderId ? { responder_id: responderId } : {};
+                        const payload = {
+                            responder_id: this.dispatchForm.responder_id ? parseInt(this.dispatchForm.responder_id) : null,
+                            eta: this.dispatchForm.eta || '8 mins',
+                        };
+                        const res = await fetch(`/emergencies/${this.dispatchTarget.id}/dispatch`, {
+                            method: 'PATCH',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            },
+                            body: JSON.stringify(payload),
+                        });
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            return alert(err.message || 'Could not dispatch responder. Please try again.');
+                        }
+                        const updated = await res.json();
+                        const existing = this.emergencies.find(e => e.id === this.dispatchTarget.id);
+                        if (existing) Object.assign(existing, updated);
+                        this.activeModal = null;
+                        this.dispatchTarget = null;
+                    } catch (err) {
+                        console.error(err);
+                        alert('Network error while dispatching responder.');
+                    } finally {
+                        this.isSubmittingDispatch = false;
+                    }
+                },
+
+                async dispatch(id, responderId = null, eta = '8 mins') {
+                    try {
+                        const payload = {
+                            responder_id: responderId,
+                            eta: eta,
+                        };
                         const res = await fetch(`/emergencies/${id}/dispatch`, {
                             method: 'PATCH',
                             headers: {
@@ -341,9 +432,46 @@
                     }
                 },
 
+                // ---- announcement composer actions ----
+                async publishAnnouncement() {
+                    if (!this.newAnnouncement.title.trim() || !this.newAnnouncement.body.trim()) {
+                        alert('Please provide both an announcement title and message content.');
+                        return;
+                    }
+                    this.isPublishingAnnouncement = true;
+                    try {
+                        const res = await fetch('/announcements', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'Content-Type': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content,
+                            },
+                            body: JSON.stringify({
+                                title: this.newAnnouncement.title.trim(),
+                                body: this.newAnnouncement.body.trim(),
+                            }),
+                        });
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => ({}));
+                            return alert(err.message || 'Could not publish announcement.');
+                        }
+                        const published = await res.json();
+                        this.announcements.unshift(published);
+                        this.newAnnouncement = { title: '', body: '' };
+                        this.settingsSaveMsg = 'Announcement broadcasted successfully to all guardian devices!';
+                        setTimeout(() => this.settingsSaveMsg = '', 5000);
+                    } catch (err) {
+                        console.error(err);
+                        alert('Network error while publishing announcement.');
+                    } finally {
+                        this.isPublishingAnnouncement = false;
+                    }
+                },
+
                 // ---- derived counters (computed from real data, not hardcoded) ----
                 get alertsCount() {
-                    return this.emergencies.filter(e => e.status !== 'resolved').length;
+                    return this.emergencies.filter(e => e.status !== 'resolved' && e.status !== 'cancelled').length;
                 },
                 get respondingCount() {
                     return this.emergencies.filter(e => e.status === 'responding').length;
@@ -355,10 +483,10 @@
                     return this.children.length;
                 },
                 get highUrgencyCount() {
-                    return this.emergencies.filter(e => e.urgency === 'high' && e.status !== 'resolved').length;
+                    return this.emergencies.filter(e => e.urgency === 'high' && e.status !== 'resolved' && e.status !== 'cancelled').length;
                 },
                 get lowUrgencyCount() {
-                    return this.emergencies.filter(e => e.urgency === 'low' && e.status !== 'resolved').length;
+                    return this.emergencies.filter(e => e.urgency === 'low' && e.status !== 'resolved' && e.status !== 'cancelled').length;
                 },
                 get unreadNotifications() {
                     return this.alertsCount;

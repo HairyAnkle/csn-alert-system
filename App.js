@@ -26,6 +26,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {
+  firebaseLoginWithEmail,
+  firebaseRegisterWithEmail,
+  firebaseResetPassword,
+  firebaseGoogleSignIn,
+  firebaseLogout,
+  formatFirebaseAuthError,
+} from './src/firebase';
 
 /* ============================================================================
  * CONFIG
@@ -53,10 +61,29 @@ const getApiBaseUrl = () => {
     }
   }
 
-  return 'http://192.168.1.4:8000/api';
+  return 'http://192.168.1.26:8000/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
+
+function normalizePhoneNumber(raw) {
+  if (!raw) return '';
+  let digits = raw.replace(/[^0-9+]/g, '');
+  if (digits.startsWith('+63')) {
+    digits = '0' + digits.slice(3);
+  } else if (digits.startsWith('63') && digits.length === 12) {
+    digits = '0' + digits.slice(2);
+  } else if (digits.length === 10 && digits.startsWith('9')) {
+    digits = '0' + digits;
+  }
+  return digits;
+}
+
+const isFirebaseOAuthDomain = () => {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+  const host = window.location?.hostname || '';
+  return host === 'localhost' || host === '127.0.0.1' || host.endsWith('.firebaseapp.com') || host.endsWith('.web.app');
+};
 
 // Development only: lets you open the Dashboard UI without a backend.
 const DEV_BYPASS_LOGIN = false;
@@ -515,6 +542,14 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
   const [errors, setErrors]     = useState({});
   const [loading, setLoading]   = useState(false);
   const [formError, setFormError] = useState('');
+  const [googleModalVisible, setGoogleModalVisible] = useState(false);
+  const [googleInputEmail, setGoogleInputEmail] = useState('');
+  const [googleInputName, setGoogleInputName] = useState('');
+  const [googleError, setGoogleError] = useState('');
+  const [phoneModalVisible, setPhoneModalVisible] = useState(false);
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneNameInput, setPhoneNameInput] = useState('');
+  const [phoneError, setPhoneError] = useState('');
 
   const validate = () => {
     const e = {};
@@ -531,13 +566,52 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
     setFormError('');
     if (!validate()) return;
     setLoading(true);
+
     try {
-      const data = await api(isSignup ? '/auth/register' : '/auth/login', {
-        method: 'POST',
-        body: isSignup
-          ? { name: name.trim(), email: email.trim(), password }
-          : { email: email.trim(), password },
-      });
+      let firebaseToken = null;
+
+      // 1. Authenticate with Firebase Auth SDK (csn-paranaque)
+      try {
+        if (isSignup) {
+          const fbRes = await firebaseRegisterWithEmail(name.trim(), email.trim(), password);
+          firebaseToken = fbRes.idToken;
+        } else {
+          const fbRes = await firebaseLoginWithEmail(email.trim(), password);
+          firebaseToken = fbRes.idToken;
+        }
+      } catch (fbErr) {
+        console.warn('Firebase Auth notice:', fbErr?.code, fbErr?.message);
+        if (isSignup && fbErr.code === 'auth/email-already-in-use') {
+          throw new Error(formatFirebaseAuthError(fbErr));
+        } else if (!isSignup && (fbErr.code === 'auth/wrong-password' || fbErr.code === 'auth/invalid-credential')) {
+          throw new Error(formatFirebaseAuthError(fbErr));
+        } else if (fbErr.code === 'auth/weak-password' || fbErr.code === 'auth/invalid-email') {
+          throw new Error(formatFirebaseAuthError(fbErr));
+        }
+        // If user already existed prior to Firebase or network is blocked, fallback will run below
+      }
+
+      // 2. Sync / exchange with Laravel Gateway
+      let data;
+      if (firebaseToken) {
+        data = await api('/auth/firebase', {
+          method: 'POST',
+          body: {
+            id_token: firebaseToken,
+            name: isSignup ? name.trim() : undefined,
+            role: 'guardian',
+          },
+        });
+      } else {
+        data = await api(isSignup ? '/auth/register' : '/auth/login', {
+          method: 'POST',
+          body: isSignup
+            ? { name: name.trim(), email: email.trim(), password }
+            : { email: email.trim(), password },
+        });
+      }
+
+      showToast(isSignup ? 'Account created successfully!' : 'Signed in successfully!');
       onAuthed(data);
     } catch (err) {
       if (err.errors) {
@@ -547,7 +621,7 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
         });
         setErrors(mapped);
       }
-      setFormError(err.message);
+      setFormError(err.message || 'Authentication failed.');
     } finally {
       setLoading(false);
     }
@@ -559,6 +633,13 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
       return;
     }
     try {
+      try {
+        await firebaseResetPassword(email.trim());
+        showToast('Password reset link sent via Firebase! Check your email.');
+        return;
+      } catch (fbErr) {
+        // Fallback to Laravel reset link
+      }
       const data = await api('/auth/forgot-password', { method: 'POST', body: { email: email.trim() } });
       showToast((data && data.message) || 'Password reset link sent. Check your email.');
     } catch (err) {
@@ -566,11 +647,105 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
     }
   };
 
+  const performGoogleAuth = async (targetEmail, targetName, idToken = null) => {
+    const cleanEmail = (targetEmail || '').trim();
+    if (!idToken && (!cleanEmail || !isValidEmail(cleanEmail))) {
+      setGoogleError('Please enter a valid Google email address.');
+      return;
+    }
+    setLoading(true);
+    setGoogleError('');
+    setFormError('');
+    try {
+      let data;
+      if (idToken) {
+        data = await api('/auth/firebase', {
+          method: 'POST',
+          body: {
+            id_token: idToken,
+            name: (targetName || '').trim() || 'Google User',
+            role: 'guardian',
+          },
+        });
+      } else {
+        data = await api('/auth/google', {
+          method: 'POST',
+          body: {
+            email: cleanEmail,
+            name: (targetName || '').trim() || undefined,
+            role: 'guardian',
+          },
+        });
+      }
+      setGoogleModalVisible(false);
+      showToast('Signed in successfully with Google!');
+      onAuthed(data);
+    } catch (err) {
+      setGoogleError(err.message || 'Google Sign-In failed.');
+      setFormError(err.message || 'Google Sign-In failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const google = () => {
-    Alert.alert(
-      'Google Sign-In',
-      'Not set up yet. Configure expo-auth-session with your Google client IDs, then send the Google token to POST /auth/google on your server.'
-    );
+    setGoogleError('');
+    setFormError('');
+
+    if (isFirebaseOAuthDomain()) {
+      (async () => {
+        try {
+          setLoading(true);
+          const res = await firebaseGoogleSignIn();
+          if (res && res.idToken) {
+            await performGoogleAuth(res.user?.email, res.user?.displayName, res.idToken);
+            return;
+          }
+        } catch (fbErr) {
+          console.warn('[Google Auth] Popup skipped or blocked:', fbErr?.code || fbErr?.message);
+        } finally {
+          setLoading(false);
+        }
+        setGoogleInputEmail(email.trim() && isValidEmail(email) ? email.trim() : '');
+        setGoogleInputName(name.trim() || '');
+        setGoogleModalVisible(true);
+      })();
+      return;
+    }
+
+    setGoogleInputEmail(email.trim() && isValidEmail(email) ? email.trim() : '');
+    setGoogleInputName(name.trim() || '');
+    setGoogleModalVisible(true);
+  };
+
+  const performPhoneAuth = async (phoneNumber, phoneName) => {
+    const raw = (phoneNumber || '').trim();
+    const cleaned = normalizePhoneNumber(raw);
+    if (!cleaned || cleaned.length < 10) {
+      setPhoneError('Please enter an 11-digit mobile number (e.g. 09171234567).');
+      return;
+    }
+    setLoading(true);
+    setPhoneError('');
+    setFormError('');
+    try {
+      const data = await api('/auth/phone', {
+        method: 'POST',
+        body: {
+          phone: cleaned,
+          name: (phoneName || '').trim() || undefined,
+          role: 'guardian',
+        },
+      });
+      setPhoneModalVisible(false);
+      showToast('Signed in successfully with Phone!');
+      onAuthed(data);
+    } catch (err) {
+      setPhoneError(err.message || 'Phone Sign-In failed.');
+      setFormError(err.message || 'Phone Sign-In failed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -622,7 +797,7 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
                 error={errors.name}
                 autoCapitalize="words"
                 leftIcon="person-outline"
-                placeholder="Maria dela Cruz"
+                placeholder="Full name"
               />
             )}
             <Field
@@ -634,7 +809,7 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
               autoCapitalize="none"
               autoCorrect={false}
               leftIcon="mail-outline"
-              placeholder="you@example.com"
+              placeholder="Email address"
             />
             <Field
               label="Password"
@@ -665,24 +840,38 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
               style={{ marginTop: 4 }}
             />
 
-            {!isSignup && (
-              <>
-                <View style={styles.dividerRow}>
-                  <View style={styles.dividerLine} />
-                  <Text style={styles.dividerText}>or</Text>
-                  <View style={styles.dividerLine} />
-                </View>
-                <Pressable
-                  onPress={google}
-                  accessibilityRole="button"
-                  accessibilityLabel="Continue with Google"
-                  style={({ pressed }) => [styles.googleBtn, pressed && { opacity: 0.8 }]}
-                >
-                  <Ionicons name="logo-google" size={20} color={C.textSec} style={{ marginRight: 10 }} />
-                  <Text style={styles.googleBtnText}>Continue with Google</Text>
-                </Pressable>
-              </>
-            )}
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or continue with</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={google}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Google"
+                style={({ pressed }) => [styles.googleBtn, { flex: 1 }, pressed && { opacity: 0.8 }]}
+              >
+                <Ionicons name="logo-google" size={18} color="#EA4335" style={{ marginRight: 8 }} />
+                <Text style={styles.googleBtnText}>Google</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => {
+                  setPhoneError('');
+                  setPhoneInput('');
+                  setPhoneNameInput(name.trim() || '');
+                  setPhoneModalVisible(true);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Phone"
+                style={({ pressed }) => [styles.googleBtn, { flex: 1 }, pressed && { opacity: 0.8 }]}
+              >
+                <Ionicons name="call-outline" size={18} color={C.brand} style={{ marginRight: 8 }} />
+                <Text style={styles.googleBtnText}>Phone</Text>
+              </Pressable>
+            </View>
           </SectionCard>
 
           <Pressable
@@ -698,6 +887,120 @@ function AuthScreen({ mode, go, onAuthed, showToast }) {
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* ── Google Sign-In Sheet / Modal ── */}
+      <Modal visible={googleModalVisible} transparent animationType="slide" onRequestClose={() => { setGoogleModalVisible(false); setGoogleError(''); }}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+
+            <View style={[styles.modalIconCircle, { backgroundColor: '#F1F5F9' }]}>
+              <Ionicons name="logo-google" size={32} color="#EA4335" />
+            </View>
+            <Text style={styles.modalTitle}>Sign In with Google</Text>
+            <Text style={styles.modalBody}>
+              Authenticate securely with your Google Guardian account.
+            </Text>
+
+            {!!googleError && (
+              <View style={[styles.errorBanner, { width: '100%', marginBottom: 12 }]}>
+                <Ionicons name="alert-circle" size={18} color={C.critical} style={{ marginRight: 8, marginTop: 1 }} />
+                <Text style={[styles.errorBannerText, { flex: 1 }]}>{googleError}</Text>
+              </View>
+            )}
+
+            <View style={{ width: '100%', marginVertical: 12 }}>
+              <Text style={styles.label}>Google Account Email</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 12 }]}
+                value={googleInputEmail}
+                onChangeText={(t) => { setGoogleInputEmail(t); setGoogleError(''); }}
+                placeholder="name@gmail.com"
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.label}>Full Name</Text>
+              <TextInput
+                style={styles.input}
+                value={googleInputName}
+                onChangeText={setGoogleInputName}
+                placeholder="Full name"
+              />
+            </View>
+
+            <View style={{ width: '100%', gap: 10 }}>
+              <PrimaryButton
+                title="Continue with Google"
+                onPress={() => performGoogleAuth(googleInputEmail, googleInputName)}
+                loading={loading}
+              />
+              <PrimaryButton
+                title="Cancel"
+                tone="ghost"
+                onPress={() => { setGoogleModalVisible(false); setGoogleError(''); }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Phone Sign-In Sheet / Modal ── */}
+      <Modal visible={phoneModalVisible} transparent animationType="slide" onRequestClose={() => { setPhoneModalVisible(false); setPhoneError(''); }}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+
+            <View style={[styles.modalIconCircle, { backgroundColor: '#EFF6FF' }]}>
+              <Ionicons name="call" size={30} color={C.brand} />
+            </View>
+            <Text style={styles.modalTitle}>Sign In with Phone</Text>
+            <Text style={styles.modalBody}>
+              Enter your mobile phone number to log in or register your guardian account.
+            </Text>
+
+            {!!phoneError && (
+              <View style={[styles.errorBanner, { width: '100%', marginBottom: 12 }]}>
+                <Ionicons name="alert-circle" size={18} color={C.critical} style={{ marginRight: 8, marginTop: 1 }} />
+                <Text style={[styles.errorBannerText, { flex: 1 }]}>{phoneError}</Text>
+              </View>
+            )}
+
+            <View style={{ width: '100%', marginVertical: 12 }}>
+              <Text style={styles.label}>Mobile Phone Number</Text>
+              <TextInput
+                style={[styles.input, { marginBottom: 12 }]}
+                value={phoneInput}
+                onChangeText={(t) => { setPhoneInput(t); setPhoneError(''); }}
+                placeholder="09XXXXXXXXX"
+                keyboardType="phone-pad"
+                autoCapitalize="none"
+              />
+
+              <Text style={styles.label}>Full Name (Guardian)</Text>
+              <TextInput
+                style={styles.input}
+                value={phoneNameInput}
+                onChangeText={setPhoneNameInput}
+                placeholder="Full name"
+              />
+            </View>
+
+            <View style={{ width: '100%', gap: 10 }}>
+              <PrimaryButton
+                title="Continue with Phone"
+                onPress={() => performPhoneAuth(phoneInput, phoneNameInput)}
+                loading={loading}
+              />
+              <PrimaryButton
+                title="Cancel"
+                tone="ghost"
+                onPress={() => { setPhoneModalVisible(false); setPhoneError(''); }}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1669,6 +1972,7 @@ export default function App() {
 
   const logout = async () => {
     try {
+      await firebaseLogout();
       if (token) {
         await api('/auth/logout', { method: 'POST', token });
       }

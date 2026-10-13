@@ -196,6 +196,33 @@
                                 }
                             });
                     }
+
+                    // Cloud Firestore Real-Time Sync Listener
+                    if (window.FirebaseClient && typeof window.FirebaseClient.listenToEmergencies === 'function') {
+                        window.FirebaseClient.listenToEmergencies((changeType, emergencyData) => {
+                            if (!emergencyData || !emergencyData.id) return;
+                            const existingIndex = this.emergencies.findIndex(item => item.id === emergencyData.id);
+
+                            if (changeType === 'added') {
+                                if (existingIndex === -1) {
+                                    this.emergencies.unshift(emergencyData);
+                                    this.playAlertSound(emergencyData.urgency || 'high');
+                                } else {
+                                    Object.assign(this.emergencies[existingIndex], emergencyData);
+                                }
+                            } else if (changeType === 'modified') {
+                                if (existingIndex !== -1) {
+                                    Object.assign(this.emergencies[existingIndex], emergencyData);
+                                } else {
+                                    this.emergencies.unshift(emergencyData);
+                                }
+                            } else if (changeType === 'removed') {
+                                if (existingIndex !== -1) {
+                                    this.emergencies.splice(existingIndex, 1);
+                                }
+                            }
+                        });
+                    }
                 },
 
                 updateClock() {
@@ -206,10 +233,10 @@
                 },
 
                 // ---- alert audio synthesizer ----
-                playAlertSound(urgency = 'high') {
+                playAlertSound(urgency = 'high', isPreview = false) {
                     const isHigh = urgency === 'high';
-                    if (isHigh && !this.settings.sound_on_high) return;
-                    if (!isHigh && !this.settings.sound_on_low) return;
+                    if (!isPreview && isHigh && !this.settings.sound_on_high) return;
+                    if (!isPreview && !isHigh && !this.settings.sound_on_low) return;
 
                     try {
                         const AudioCtx = window.AudioContext || window.webkitAudioContext;
@@ -523,6 +550,23 @@
                     } finally {
                         this.isLoadingChild = false;
                     }
+                },
+
+                formatMedicalNotes(notes) {
+                    if (!notes) return 'No confidential medical notes recorded.';
+                    const trimmed = String(notes).trim();
+                    if (trimmed === 'No notes recorded.' || trimmed === 'No confidential medical notes recorded.') {
+                        return 'No confidential medical notes recorded.';
+                    }
+                    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+                        try {
+                            const parsed = JSON.parse(trimmed);
+                            return parsed.medical_notes || parsed.notes || parsed.clinical_notes || 'No confidential medical notes recorded.';
+                        } catch (e) {
+                            return notes;
+                        }
+                    }
+                    return notes;
                 },
 
                 async saveChildProfile(formElement) {

@@ -2,13 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\EmergencyRaised;
+use App\Actions\RaiseEmergency;
 use App\Models\Emergency;
 use App\Models\User;
 use App\Services\SmsNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class EmergencyController extends Controller
 {
@@ -49,7 +48,7 @@ class EmergencyController extends Controller
             'eta' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $result = app(\App\Actions\RaiseEmergency::class)->execute($validated, $request->user());
+        $result = app(RaiseEmergency::class)->execute($validated, $request->user());
 
         return response()->json($result['emergency']->toFrontendArray(), 201);
     }

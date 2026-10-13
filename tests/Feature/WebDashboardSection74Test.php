@@ -16,8 +16,11 @@ class WebDashboardSection74Test extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $staff;
+
     protected User $responder;
+
     protected User $guardian;
 
     protected function setUp(): void
@@ -252,4 +255,3 @@ class WebDashboardSection74Test extends TestCase
         $response->assertViewHas('emergencies');
     }
 }
-

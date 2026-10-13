@@ -25,11 +25,10 @@ class EmergencyResource extends JsonResource
                 'id' => $this->responder->id,
                 'name' => $this->responder->name,
                 'unit' => $this->responder->unit ?? $this->responder->name,
-                'eta'  => $this->eta ?? '5-10 mins',
+                'eta' => $this->eta ?? '5-10 mins',
                 'phone' => $this->responder->phone ?? '',
             ] : null,
             'reported_at' => $this->reported_at?->toIso8601String() ?? $this->created_at?->toIso8601String(), // keep UTC
         ];
     }
 }
-

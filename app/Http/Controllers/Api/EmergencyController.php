@@ -2,7 +2,4 @@
 
 namespace App\Http\Controllers\Api;
 
-class EmergencyController extends EmergencyApiController
-{
-}
-
+class EmergencyController extends EmergencyApiController {}

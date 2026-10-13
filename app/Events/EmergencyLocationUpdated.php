@@ -50,4 +50,3 @@ class EmergencyLocationUpdated implements ShouldBroadcast
         ];
     }
 }
-

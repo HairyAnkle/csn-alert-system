@@ -26,3 +26,6 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 TODO.md
+firebase-credentials.json
+/storage/app/firebase/
+/storage/firebase/

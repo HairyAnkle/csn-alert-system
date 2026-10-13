@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Announcement;
 use App\Models\ChildProfile;
 use App\Models\Emergency;
 use App\Models\Setting;
@@ -101,12 +102,12 @@ class DashboardController extends Controller
         $settings = Setting::allValues();
         $monthlyStats = $this->calculateMonthlyStats();
 
-        $announcements = \App\Models\Announcement::with('creator')
+        $announcements = Announcement::with('creator')
             ->latest('published_at')
             ->latest('created_at')
             ->limit(30)
             ->get()
-            ->map(fn (\App\Models\Announcement $a) => [
+            ->map(fn (Announcement $a) => [
                 'id' => $a->id,
                 'title' => $a->title,
                 'body' => $a->body,

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\RaiseEmergency;
 use App\Events\EmergencyCancelled;
 use App\Events\EmergencyLocationUpdated;
-use App\Events\EmergencyRaised;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\EmergencyResource;
 use App\Models\Emergency;
@@ -40,12 +40,12 @@ class EmergencyApiController extends Controller
     {
         $d = $request->validate([
             'type' => ['required', Rule::in(['medical_crisis', 'seizure_sensory', 'wandering', 'fire'])],
-            'lat'  => 'nullable|numeric|between:-90,90',
-            'lng'  => 'nullable|numeric|between:-180,180',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
         ]);
 
         $user = $request->user();
-        $result = app(\App\Actions\RaiseEmergency::class)->execute($d, $user);
+        $result = app(RaiseEmergency::class)->execute($d, $user);
 
         return response()->json([
             'emergency' => (new EmergencyResource($result['emergency']))->resolve(),

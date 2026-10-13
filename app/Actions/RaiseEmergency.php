@@ -5,6 +5,7 @@ namespace App\Actions;
 use App\Events\EmergencyRaised;
 use App\Models\Emergency;
 use App\Models\User;
+use App\Services\FcmNotificationService;
 use Illuminate\Support\Facades\Log;
 
 class RaiseEmergency
@@ -12,8 +13,7 @@ class RaiseEmergency
     /**
      * Execute emergency creation with double-tap protection, geocoding fallback, and real-time broadcasting.
      *
-     * @param array<string, mixed> $data
-     * @param User|null $actor
+     * @param  array<string, mixed>  $data
      * @return array{emergency: Emergency, was_existing: bool}
      */
     public function execute(array $data, ?User $actor = null): array
@@ -50,18 +50,18 @@ class RaiseEmergency
         $childId = $data['child_id'] ?? ($actor?->child?->id ?? null);
 
         $emergency = Emergency::create([
-            'child_id'       => $childId,
-            'guardian_id'   => $guardianId,
-            'type'          => $data['type'] ?? 'medical_crisis',
-            'urgency'       => $data['urgency'] ?? 'high',
-            'status'        => 'pending',
-            'location'      => $location,
-            'lat'           => isset($data['lat']) ? (float) $data['lat'] : null,
-            'lng'           => isset($data['lng']) ? (float) $data['lng'] : null,
-            'guardian_notes'=> $data['guardian_notes'] ?? null,
-            'responder_id'  => $data['responder_id'] ?? null,
-            'eta'           => $data['eta'] ?? null,
-            'reported_at'   => now(),
+            'child_id' => $childId,
+            'guardian_id' => $guardianId,
+            'type' => $data['type'] ?? 'medical_crisis',
+            'urgency' => $data['urgency'] ?? 'high',
+            'status' => 'pending',
+            'location' => $location,
+            'lat' => isset($data['lat']) ? (float) $data['lat'] : null,
+            'lng' => isset($data['lng']) ? (float) $data['lng'] : null,
+            'guardian_notes' => $data['guardian_notes'] ?? null,
+            'responder_id' => $data['responder_id'] ?? null,
+            'eta' => $data['eta'] ?? null,
+            'reported_at' => now(),
         ]);
 
         $emergency->load(['child', 'responder']);
@@ -73,10 +73,16 @@ class RaiseEmergency
             Log::warning('Reverb broadcasting failed during emergency alert: '.$e->getMessage());
         }
 
+        // Push notification via Firebase Cloud Messaging (FCM)
+        try {
+            app(FcmNotificationService::class)->sendEmergencyAlert($emergency);
+        } catch (\Throwable $e) {
+            Log::warning('FCM notification dispatch failed: '.$e->getMessage());
+        }
+
         return [
             'emergency' => $emergency,
             'was_existing' => false,
         ];
     }
 }
-

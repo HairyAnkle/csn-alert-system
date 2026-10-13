@@ -33,19 +33,24 @@
                             <p class="text-sm font-semibold text-slate-800">Critical / High Urgency Alerts</p>
                         </div>
                         <p class="text-xs text-slate-500 mt-0.5">Pulsing alarm tone for medical crises and active wanderings.</p>
-                        <button type="button" @click="playAlertSound('high')"
+                        <button type="button" @click="playAlertSound('high', true)"
                                 class="mt-2 inline-flex items-center gap-1.5 rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200 focus-ring">
                             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                             Preview Alarm Sound
                         </button>
                     </div>
-                    <button type="button" role="switch" :aria-checked="settings.sound_on_high"
-                            @click="toggleSoundSetting('sound_on_high')"
-                            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-ring"
-                            :class="settings.sound_on_high ? 'bg-brand-700' : 'bg-slate-300'">
-                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition"
-                              :class="settings.sound_on_high ? 'translate-x-6' : 'translate-x-1'"></span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-semibold select-none"
+                              :class="settings.sound_on_high ? 'text-emerald-700' : 'text-slate-400'"
+                              x-text="settings.sound_on_high ? 'ON' : 'OFF'"></span>
+                        <button type="button" role="switch" :aria-checked="settings.sound_on_high"
+                                @click="toggleSoundSetting('sound_on_high')"
+                                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-ring"
+                                :class="settings.sound_on_high ? 'bg-emerald-600' : 'bg-slate-300'">
+                            <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out"
+                                  :class="settings.sound_on_high ? 'translate-x-4' : 'translate-x-0'"></span>
+                        </button>
+                    </div>
                 </div>
 
                 {{-- Low Urgency Alert Toggle --}}
@@ -56,19 +61,24 @@
                             <p class="text-sm font-semibold text-slate-800">Routine / Low Urgency Alerts</p>
                         </div>
                         <p class="text-xs text-slate-500 mt-0.5">Gentle chime notification for standard assistance logs.</p>
-                        <button type="button" @click="playAlertSound('low')"
+                        <button type="button" @click="playAlertSound('low', true)"
                                 class="mt-2 inline-flex items-center gap-1.5 rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200 focus-ring">
                             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                             Preview Gentle Chime
                         </button>
                     </div>
-                    <button type="button" role="switch" :aria-checked="settings.sound_on_low"
-                            @click="toggleSoundSetting('sound_on_low')"
-                            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-ring"
-                            :class="settings.sound_on_low ? 'bg-brand-700' : 'bg-slate-300'">
-                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition"
-                              :class="settings.sound_on_low ? 'translate-x-6' : 'translate-x-1'"></span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-semibold select-none"
+                              :class="settings.sound_on_low ? 'text-emerald-700' : 'text-slate-400'"
+                              x-text="settings.sound_on_low ? 'ON' : 'OFF'"></span>
+                        <button type="button" role="switch" :aria-checked="settings.sound_on_low"
+                                @click="toggleSoundSetting('sound_on_low')"
+                                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus-ring"
+                                :class="settings.sound_on_low ? 'bg-emerald-600' : 'bg-slate-300'">
+                            <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out"
+                                  :class="settings.sound_on_low ? 'translate-x-4' : 'translate-x-0'"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -84,18 +94,22 @@
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-slate-700">PDRRMO Emergency Desk</label>
                     <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        </div>
                         <input type="text" x-model="settings.hotline_pdrrmo" placeholder="e.g. (02) 8820-7377"
-                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-9 pr-3 font-mono text-xs focus-ring">
-                        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-10 pr-3 font-mono text-xs focus-ring">
                     </div>
                 </div>
 
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-slate-700">Ambulance / Medical Unit</label>
                     <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                        </div>
                         <input type="text" x-model="settings.hotline_ambulance" placeholder="e.g. 911 / (02) 8825-1022"
-                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-9 pr-3 font-mono text-xs focus-ring">
-                        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-10 pr-3 font-mono text-xs focus-ring">
                     </div>
                 </div>
 

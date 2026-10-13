@@ -53,4 +53,3 @@ class AnnouncementController extends Controller
         ], 201);
     }
 }
-

@@ -194,4 +194,43 @@ class ChildProfileTest extends TestCase
         $response->assertStatus(200);
         $this->assertDatabaseMissing('child_profiles', ['id' => $child->id]);
     }
+
+    public function test_child_profile_decodes_legacy_medical_notes_json_cleanly(): void
+    {
+        $staff = User::factory()->create(['role' => 'staff']);
+        $staff->assignRole('staff');
+
+        $child = ChildProfile::factory()->create([
+            'medical_notes' => json_encode([
+                'allergies' => 'None',
+                'medications' => 'None',
+                'communication_notes' => 'None',
+                'emergency_contact_phone' => '09170001122',
+            ]),
+        ]);
+
+        $response = $this->actingAs($staff)->getJson("/children/{$child->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('notes', 'No confidential medical notes recorded.');
+        $this->assertStringNotContainsString('{', $response->json('notes'));
+    }
+
+    public function test_child_profile_preserves_real_medical_notes_from_json_if_present(): void
+    {
+        $staff = User::factory()->create(['role' => 'staff']);
+        $staff->assignRole('staff');
+
+        $child = ChildProfile::factory()->create([
+            'medical_notes' => json_encode([
+                'allergies' => 'Dust',
+                'medical_notes' => 'Patient has severe bronchial asthma protocols.',
+            ]),
+        ]);
+
+        $response = $this->actingAs($staff)->getJson("/children/{$child->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('notes', 'Patient has severe bronchial asthma protocols.');
+    }
 }

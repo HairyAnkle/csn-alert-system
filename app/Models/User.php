@@ -14,6 +14,7 @@ use Laravel\Sanctum\HasApiTokens;
 use Spatie\Activitylog\Models\Concerns\CausesActivity;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
+use Spatie\Permission\Contracts\Role;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'role', 'phone', 'unit', 'status', 'is_active'])]
@@ -62,11 +63,11 @@ class User extends Authenticatable
     /**
      * Check if user has role (checks both Spatie roles and role column).
      */
-    public function hasRole($roles, string $guard = null): bool
+    public function hasRole($roles, ?string $guard = null): bool
     {
         $roleList = collect(is_array($roles) || $roles instanceof \Traversable ? $roles : [$roles])
             ->flatten()
-            ->map(fn ($r) => is_string($r) ? $r : ($r instanceof \Spatie\Permission\Contracts\Role ? $r->name : (string) $r))
+            ->map(fn ($r) => is_string($r) ? $r : ($r instanceof Role ? $r->name : (string) $r))
             ->map('strtolower')
             ->all();
 

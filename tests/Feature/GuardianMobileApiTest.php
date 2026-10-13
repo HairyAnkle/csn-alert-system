@@ -12,6 +12,7 @@ use Tests\TestCase;
 class GuardianMobileApiTest extends TestCase
 {
     use RefreshDatabase;
+
     public function test_guardian_can_register_via_api(): void
     {
         $response = $this->postJson('/api/auth/register', [
@@ -232,8 +233,15 @@ class GuardianMobileApiTest extends TestCase
             ->assertJsonPath('message', 'Logged out successfully.');
 
         // Test google route
-        $googleResponse = $this->postJson('/api/auth/google');
-        $googleResponse->assertStatus(501);
+        $emptyGoogleResponse = $this->postJson('/api/auth/google');
+        $emptyGoogleResponse->assertStatus(422);
+
+        $googleResponse = $this->postJson('/api/auth/google', [
+            'email' => 'google_parent@gmail.com',
+            'name' => 'Google Parent',
+        ]);
+        $googleResponse->assertStatus(200)
+            ->assertJsonStructure(['token', 'user' => ['id', 'email', 'name', 'role']]);
     }
 
     public function test_double_tap_protection_returns_existing_active_emergency(): void

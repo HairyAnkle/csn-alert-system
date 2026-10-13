@@ -43,4 +43,3 @@ class EmergencyPolicy
         return $user->id === $emergency->guardian_id;
     }
 }
-

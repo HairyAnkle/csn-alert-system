@@ -69,12 +69,17 @@
             <div>
                 <label class="mb-1 block text-xs font-semibold text-slate-600">Keyword Search</label>
                 <div class="relative">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                    </div>
                     <input type="text"
                            x-model="incidentSearch"
                            @input.debounce.350ms="fetchIncidents()"
                            placeholder="Child, unit, notes..."
                            class="min-h-[40px] w-full rounded-lg border border-slate-300 bg-white pl-8 pr-3 text-xs text-slate-700 placeholder-slate-400 focus-ring">
-                    <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                 </div>
             </div>
         </div>

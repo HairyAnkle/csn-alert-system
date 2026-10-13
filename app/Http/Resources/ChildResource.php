@@ -28,4 +28,3 @@ class ChildResource extends JsonResource
         ];
     }
 }
-

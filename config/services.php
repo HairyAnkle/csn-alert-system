@@ -45,4 +45,9 @@ return [
         'default_recipient' => env('SEMAPHORE_DEFAULT_RECIPIENT'),
     ],
 
+    'firebase' => [
+        'api_key' => env('FIREBASE_API_KEY', env('VITE_FIREBASE_API_KEY')),
+        'project_id' => env('FIREBASE_PROJECT_ID', 'csn-paranaque'),
+    ],
+
 ];

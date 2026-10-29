@@ -376,17 +376,19 @@ class AuthController extends Controller
         $this->registerFirebaseTestPhone($e164, $otp);
 
         // 3. Request sessionInfo from Firebase Identity Platform REST API
-        $firebaseApiKey = env('VITE_FIREBASE_API_KEY', 'AIzaSyBTy_U-UYSLg9kcnDjgSKcFzVF7cYg3MbY');
+        $firebaseApiKey = config('services.firebase.api_key') ?? env('FIREBASE_API_KEY') ?? env('VITE_FIREBASE_API_KEY');
         $sessionInfo = null;
-        try {
-            $fbRes = Http::timeout(5)->post("https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key={$firebaseApiKey}", [
-                'phoneNumber' => $e164,
-            ]);
-            if ($fbRes->successful()) {
-                $sessionInfo = $fbRes->json('sessionInfo');
+        if (! empty($firebaseApiKey)) {
+            try {
+                $fbRes = Http::timeout(5)->post("https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key={$firebaseApiKey}", [
+                    'phoneNumber' => $e164,
+                ]);
+                if ($fbRes->successful()) {
+                    $sessionInfo = $fbRes->json('sessionInfo');
+                }
+            } catch (\Throwable $fbErr) {
+                Log::warning('Firebase sendVerificationCode REST call failed: '.$fbErr->getMessage());
             }
-        } catch (\Throwable $fbErr) {
-            Log::warning('Firebase sendVerificationCode REST call failed: '.$fbErr->getMessage());
         }
 
         return response()->json([

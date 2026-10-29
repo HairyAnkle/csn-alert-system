@@ -13,7 +13,7 @@ export const IS_DEV = typeof __DEV__ !== 'undefined' ? Boolean(__DEV__) : proces
  * Allows the mobile app to communicate over the internet (mobile data / any Wi-Fi).
  * Set to null or empty string ('') to fall back to local LAN Wi-Fi (192.168.1.x:8000).
  */
-export const CLOUDFLARE_TUNNEL_URL = 'https://signing-sponsored-len-medications.trycloudflare.com';
+export const CLOUDFLARE_TUNNEL_URL = process.env.EXPO_PUBLIC_CLOUDFLARE_TUNNEL_URL || 'https://signing-sponsored-len-medications.trycloudflare.com';
 
 // Dynamic API base URL resolution:
 // 1. Cloudflare Tunnel (if active, enables global access over LTE/5G & remote Wi-Fi)

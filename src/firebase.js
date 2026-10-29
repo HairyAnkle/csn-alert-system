@@ -22,13 +22,13 @@ try {
 } catch (_) {}
 
 export const firebaseConfig = {
-  apiKey: "AIzaSyBTy_U-UYSLg9kcnDjgSKcFzVF7cYg3MbY",
-  authDomain: "csn-paranaque.firebaseapp.com",
-  projectId: "csn-paranaque",
-  storageBucket: "csn-paranaque.firebasestorage.app",
-  messagingSenderId: "967210951869",
-  appId: "1:967210951869:web:cbaf23ab665ed911efc3d4",
-  measurementId: "G-JBDK92QXWD"
+  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "csn-paranaque.firebaseapp.com",
+  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "csn-paranaque",
+  storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || "csn-paranaque.firebasestorage.app",
+  messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "967210951869",
+  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 
 // Initialize Firebase App

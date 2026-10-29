@@ -20,7 +20,7 @@ class AnnouncementController extends Controller
 
         $role = strtolower($user->roles->first()?->name ?? $user->role ?? '');
 
-        if (! in_array($role, ['admin', 'staff'], true)) {
+        if (! in_array($role, ['superadmin', 'admin'], true)) {
             abort(403, 'Unauthorized to publish announcements.');
         }
     }

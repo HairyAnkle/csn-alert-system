@@ -37,17 +37,24 @@
             <x-input-error :messages="$errors->get('password')" class="mt-1.5 text-xs text-red-600" />
         </div>
 
-        <!-- Remember Me -->
-        <div class="flex items-center justify-between pt-1">
-            <label for="remember_me" class="inline-flex items-center cursor-pointer select-none">
-                <input id="remember_me" type="checkbox" class="rounded border-slate-300 text-brand-700 shadow-sm focus:ring-brand-700" name="remember">
-                <span class="ms-2 text-xs font-medium text-slate-600">{{ __('Remember this device') }}</span>
+        <!-- Remember Me & Terms Agreement (Table 1.13) -->
+        <div class="space-y-2.5 pt-1">
+            <label for="terms_agreed" class="flex items-center cursor-pointer select-none">
+                <input id="terms_agreed" type="checkbox" required style="width: 18px; height: 18px; min-width: 18px; min-height: 18px;" class="shrink-0 rounded border-slate-300 text-brand-700 shadow-sm focus:ring-brand-700" name="terms_agreed" {{ old('terms_agreed', true) ? 'checked' : '' }}>
+                <span class="ms-2.5 text-xs text-slate-600 leading-snug">
+                    I agree to the <span class="text-brand-700 font-semibold hover:underline">Terms and Conditions</span> and Data Privacy Act (RA 10173).
+                </span>
+            </label>
+
+            <label for="remember_me" class="flex items-center cursor-pointer select-none">
+                <input id="remember_me" type="checkbox" style="width: 18px; height: 18px; min-width: 18px; min-height: 18px;" class="shrink-0 rounded border-slate-300 text-brand-700 shadow-sm focus:ring-brand-700" name="remember">
+                <span class="ms-2.5 text-xs font-medium text-slate-600">{{ __('Remember this device') }}</span>
             </label>
         </div>
 
         <div class="pt-2">
             <x-primary-button class="w-full justify-center py-2.5 text-sm font-semibold tracking-wide">
-                {{ __('Sign In') }}
+                {{ __('Login') }}
             </x-primary-button>
         </div>
     </form>

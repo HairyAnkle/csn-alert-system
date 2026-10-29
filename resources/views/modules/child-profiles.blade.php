@@ -1,5 +1,6 @@
 {{-- ============ MODULE 3: CHILD PROFILE MANAGEMENT ============ --}}
-<div class="space-y-5">
+<div>
+<div x-show="currentTab === 'children'" x-cloak class="space-y-5">
 
     {{-- Search + add --}}
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -78,6 +79,7 @@
             </table>
         </div>
     </div>
+</div>
 
     {{-- Slide-over: View Full Medical Profile --}}
     <div x-show="activeModal === 'viewChild'" x-cloak class="fixed inset-0 z-50" aria-modal="true" role="dialog">

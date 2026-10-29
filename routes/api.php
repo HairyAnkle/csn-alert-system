@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AnnouncementController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ChildController;
 use App\Http\Controllers\Api\EmergencyController;
+use App\Http\Controllers\Api\SupportChatApiController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,6 +24,8 @@ Route::prefix('auth')->group(function () {
     Route::post('google', [AuthController::class, 'google']);   // later
     Route::post('firebase', [AuthController::class, 'firebase'])->middleware('throttle:10,1');
     Route::post('phone', [AuthController::class, 'phone'])->middleware('throttle:10,1');
+    Route::post('phone/send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:10,1');
+    Route::post('phone/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:10,1');
 });
 
 Route::middleware(['auth:sanctum', 'role:guardian'])->group(function () {
@@ -38,4 +41,7 @@ Route::middleware(['auth:sanctum', 'role:guardian'])->group(function () {
     Route::post('emergencies/{emergency}/cancel', [EmergencyController::class, 'cancel']);
 
     Route::get('announcements', [AnnouncementController::class, 'index']);
+
+    Route::get('support/messages', [SupportChatApiController::class, 'index']);
+    Route::post('support/messages', [SupportChatApiController::class, 'store']);
 });

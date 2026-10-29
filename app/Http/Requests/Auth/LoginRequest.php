@@ -53,6 +53,17 @@ class LoginRequest extends FormRequest
             ]);
         }
 
+        if ($user) {
+            $userRole = strtolower($user->roles->first()?->name ?? $user->role ?? '');
+            if (! in_array($userRole, ['superadmin', 'admin'], true)) {
+                RateLimiter::hit($this->throttleKey());
+
+                throw ValidationException::withMessages([
+                    'email' => 'Access denied. The Web Command Center is reserved for CSN Administrators only. Guardians should use the mobile app.',
+                ]);
+            }
+        }
+
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 

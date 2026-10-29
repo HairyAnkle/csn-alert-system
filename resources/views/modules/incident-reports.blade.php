@@ -9,6 +9,12 @@
         </div>
         <div class="flex flex-wrap gap-2">
             <button type="button"
+                    @click="currentTab = 'emergency'; activeModal = 'logEmergency'"
+                    class="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-brand-700 px-3.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-800 focus-ring">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Create New Report
+            </button>
+            <button type="button"
                     @click="triggerExport('pdf')"
                     class="inline-flex min-h-[42px] items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-400 focus-ring">
                 <svg class="h-4 w-4 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>

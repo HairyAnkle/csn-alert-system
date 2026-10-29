@@ -13,7 +13,8 @@ class RegistrationTest extends TestCase
     {
         $response = $this->get('/register');
 
-        $response->assertStatus(200);
+        $response->assertRedirect('/login');
+        $response->assertSessionHas('status', 'Public registration is disabled. Web Command Center access is restricted to authorized personnel.');
     }
 
     public function test_new_users_can_register(): void
@@ -25,7 +26,7 @@ class RegistrationTest extends TestCase
             'password_confirmation' => 'password',
         ]);
 
-        $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
+        $this->assertGuest();
+        $response->assertRedirect('/login');
     }
 }

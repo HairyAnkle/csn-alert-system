@@ -142,6 +142,7 @@ class Emergency extends Model
             'seizure_sensory', 'seizure / sensory' => 'Seizure / Sensory',
             'fire', 'fire / environmental' => 'Fire / Environmental',
             'wandering', 'wandering / elopement' => 'Wandering / Elopement',
+            'general', 'general emergency' => 'General Emergency',
             default => ucfirst((string) $this->type),
         };
     }
@@ -152,6 +153,25 @@ class Emergency extends Model
     public function getReportedAtHumanAttribute(): string
     {
         return $this->reported_at?->diffForHumans() ?? 'Just now';
+    }
+
+    /**
+     * Formatted specific location with reverse geocoding fallback for raw coordinates.
+     */
+    public function getFormattedLocationAttribute(): string
+    {
+        if (! empty($this->location) && ! str_starts_with($this->location, 'Live GPS')) {
+            return $this->location;
+        }
+
+        if ($this->lat !== null && $this->lng !== null) {
+            $resolved = app(GeocodingService::class)->reverseGeocode((float) $this->lat, (float) $this->lng);
+            if ($resolved) {
+                return $resolved;
+            }
+        }
+
+        return $this->location ?? 'Parañaque City';
     }
 
     /**
@@ -168,12 +188,13 @@ class Emergency extends Model
             'urgency' => $this->urgency ?? 'high',
             'status' => $this->status ?? 'pending',
             'child_id' => $this->child_id,
-            'location' => $this->location,
+            'location' => $this->formatted_location,
             'lat' => $this->lat !== null ? (float) $this->lat : null,
             'lng' => $this->lng !== null ? (float) $this->lng : null,
             'coords' => $this->coords,
             'guardianNotes' => $this->guardian_notes ?? 'No additional notes provided.',
             'reportedAt' => $this->reported_at_human,
+            'reportedAtTimestamp' => $this->reported_at?->timestamp ?? now()->timestamp,
             'responderId' => $this->responder_id,
             'eta' => $this->eta,
             'responder' => $this->responder ? [
@@ -187,6 +208,8 @@ class Emergency extends Model
             'acknowledgedAt' => $this->acknowledged_at?->diffForHumans(),
             'dispatchedAt' => $this->dispatched_at?->diffForHumans(),
             'resolvedAt' => $this->resolved_at?->diffForHumans(),
+            'resolvedDate' => $this->resolved_at?->format('Y-m-d'),
+            'resolvedAtTimestamp' => $this->resolved_at?->timestamp,
             'cancelledAt' => $this->cancelled_at?->diffForHumans(),
             'incident_summary' => $this->incident_summary,
             'child' => $this->child ? [

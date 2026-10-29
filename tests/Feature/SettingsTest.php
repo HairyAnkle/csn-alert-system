@@ -19,17 +19,6 @@ class SettingsTest extends TestCase
         $this->seed(RoleSeeder::class);
     }
 
-    protected function createStaff(): User
-    {
-        $staff = User::factory()->create([
-            'role' => 'staff',
-            'is_active' => true,
-        ]);
-        $staff->assignRole('staff');
-
-        return $staff;
-    }
-
     protected function createAdmin(): User
     {
         $admin = User::factory()->create([
@@ -39,6 +28,17 @@ class SettingsTest extends TestCase
         $admin->assignRole('admin');
 
         return $admin;
+    }
+
+    protected function createSuperadmin(): User
+    {
+        $superadmin = User::factory()->create([
+            'role' => 'superadmin',
+            'is_active' => true,
+        ]);
+        $superadmin->assignRole('superadmin');
+
+        return $superadmin;
     }
 
     public function test_unauthenticated_user_cannot_access_or_patch_settings(): void
@@ -56,11 +56,11 @@ class SettingsTest extends TestCase
         $this->actingAs($guardian)->patchJson('/settings', ['sound_on_high' => false])->assertStatus(403);
     }
 
-    public function test_staff_can_view_default_settings(): void
+    public function test_admin_can_view_default_settings(): void
     {
-        $staff = $this->createStaff();
+        $admin = $this->createAdmin();
 
-        $response = $this->actingAs($staff)->getJson('/settings');
+        $response = $this->actingAs($admin)->getJson('/settings');
 
         $response->assertOk();
         $response->assertJson([
@@ -71,9 +71,9 @@ class SettingsTest extends TestCase
         ]);
     }
 
-    public function test_staff_can_patch_and_persist_settings(): void
+    public function test_admin_can_patch_and_persist_settings(): void
     {
-        $staff = $this->createStaff();
+        $admin = $this->createAdmin();
 
         $payload = [
             'sound_on_high' => false,
@@ -82,7 +82,7 @@ class SettingsTest extends TestCase
             'hotline_ambulance' => '911',
         ];
 
-        $response = $this->actingAs($staff)->patchJson('/settings', $payload);
+        $response = $this->actingAs($admin)->patchJson('/settings', $payload);
 
         $response->assertOk();
         $response->assertJsonFragment([
@@ -96,9 +96,9 @@ class SettingsTest extends TestCase
         $this->assertEquals('(02) 8820-9999', Setting::get('hotline_pdrrmo'));
     }
 
-    public function test_admin_receives_audit_log_on_dashboard(): void
+    public function test_superadmin_receives_audit_log_on_dashboard(): void
     {
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
 
         // Cause an activity to be recorded
         $child = ChildProfile::create([
@@ -106,7 +106,7 @@ class SettingsTest extends TestCase
             'condition' => 'ADHD',
         ]);
 
-        $response = $this->actingAs($admin)->get('/');
+        $response = $this->actingAs($superadmin)->get('/');
 
         $response->assertOk();
         $response->assertViewHas('auditLog');
@@ -115,11 +115,11 @@ class SettingsTest extends TestCase
         $this->assertNotEmpty($auditLog);
     }
 
-    public function test_non_admin_does_not_receive_audit_log(): void
+    public function test_non_superadmin_does_not_receive_audit_log(): void
     {
-        $staff = $this->createStaff();
+        $admin = $this->createAdmin();
 
-        $response = $this->actingAs($staff)->get('/');
+        $response = $this->actingAs($admin)->get('/');
 
         $response->assertOk();
         $response->assertViewHas('auditLog');
@@ -130,9 +130,9 @@ class SettingsTest extends TestCase
 
     public function test_settings_blade_view_renders_correctly(): void
     {
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
 
-        $response = $this->actingAs($admin)->get('/');
+        $response = $this->actingAs($superadmin)->get('/');
 
         $response->assertOk();
         $response->assertSee('Alert Sound Notifications');

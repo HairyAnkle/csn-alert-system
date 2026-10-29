@@ -70,4 +70,39 @@ class PasswordResetTest extends TestCase
             return true;
         });
     }
+
+    public function test_reset_password_screen_can_be_rendered_when_authenticated(): void
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get('/reset-password/fake-token');
+
+        $response->assertStatus(200);
+    }
+
+    public function test_password_reset_logs_out_authenticated_user(): void
+    {
+        Notification::fake();
+
+        $user = User::factory()->create();
+
+        $this->post('/forgot-password', ['email' => $user->email]);
+
+        Notification::assertSentTo($user, ResetPassword::class, function ($notification) use ($user) {
+            $response = $this->actingAs($user)->post('/reset-password', [
+                'token' => $notification->token,
+                'email' => $user->email,
+                'password' => 'new-password123',
+                'password_confirmation' => 'new-password123',
+            ]);
+
+            $response
+                ->assertSessionHasNoErrors()
+                ->assertRedirect(route('login'));
+
+            $this->assertGuest();
+
+            return true;
+        });
+    }
 }

@@ -26,7 +26,7 @@ class IncidentReportController extends Controller
 
         $role = strtolower($user->roles->first()?->name ?? $user->role ?? '');
 
-        if (! in_array($role, ['admin', 'staff', 'responder'], true)) {
+        if (! in_array($role, ['superadmin', 'admin', 'responder'], true)) {
             abort(403, 'Unauthorized. Incident reporting is restricted to authorized personnel.');
         }
     }

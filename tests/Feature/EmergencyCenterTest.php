@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Actions\RaiseEmergency;
 use App\Events\EmergencyRaised;
 use App\Models\ChildProfile;
 use App\Models\Emergency;
 use App\Models\User;
+use App\Services\GeocodingService;
 use App\Services\SmsNotificationService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -34,8 +36,8 @@ class EmergencyCenterTest extends TestCase
 
     public function test_authenticated_users_can_list_emergencies(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $emergency = Emergency::factory()->create();
 
@@ -53,8 +55,8 @@ class EmergencyCenterTest extends TestCase
     {
         Event::fake([EmergencyRaised::class]);
 
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $child = ChildProfile::factory()->create([
             'name' => 'Miguel Tan',
@@ -91,8 +93,8 @@ class EmergencyCenterTest extends TestCase
 
     public function test_emergency_can_be_created_even_if_broadcasting_server_is_offline(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $child = ChildProfile::factory()->create([
             'name' => 'Sara Santos',
@@ -149,8 +151,8 @@ class EmergencyCenterTest extends TestCase
             ->andReturn(true);
         $this->app->instance(SmsNotificationService::class, $smsMock);
 
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $responder = User::factory()->create([
             'name' => 'Officer Reyes',
@@ -216,8 +218,8 @@ class EmergencyCenterTest extends TestCase
 
     public function test_emergency_center_view_renders_log_emergency_modal_and_controls(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $emergency = Emergency::factory()->create([
             'status' => 'pending',
@@ -232,5 +234,114 @@ class EmergencyCenterTest extends TestCase
         $response->assertSee('Dispatch Responder');
         $response->assertSee('Mark Resolved');
         $response->assertSee('activeModal === \'logEmergency\'', false);
+    }
+
+    public function test_admin_or_superadmin_can_dispatch_barangay_responder_unit_with_eta(): void
+    {
+        $smsMock = Mockery::mock(SmsNotificationService::class);
+        $smsMock->shouldReceive('notifyDispatchedUnit')
+            ->once()
+            ->andReturn(true);
+        $this->app->instance(SmsNotificationService::class, $smsMock);
+
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+
+        $emergency = Emergency::factory()->create([
+            'status' => 'pending',
+            'dispatched_at' => null,
+            'responder_id' => null,
+        ]);
+
+        $response = $this->actingAs($admin)->patchJson("/emergencies/{$emergency->id}/dispatch", [
+            'barangay_unit' => 'Brgy. BF Homes Emergency Response Team',
+            'barangay_phone' => '(02) 8825-4411',
+            'eta' => '6 mins',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('status', 'responding');
+        $response->assertJsonPath('eta', '6 mins');
+        $response->assertJsonPath('responder.name', 'Brgy. BF Homes Emergency Response Team');
+        $response->assertJsonPath('responder.phone', '(02) 8825-4411');
+
+        $emergency->refresh();
+        $this->assertEquals('responding', $emergency->status);
+        $this->assertEquals('6 mins', $emergency->eta);
+        $this->assertNotNull($emergency->responder_id);
+        $this->assertNotNull($emergency->dispatched_at);
+    }
+
+    public function test_alert_at_silverio_compound_geocodes_and_assigns_san_isidro_coordinates_accurately(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+
+        $child = ChildProfile::factory()->create([
+            'name' => 'Angelo Santos',
+            'condition' => 'Sensory Processing Sensitivity',
+        ]);
+
+        $response = $this->actingAs($admin)->postJson('/emergencies', [
+            'child_id' => $child->id,
+            'type' => 'medical_crisis',
+            'urgency' => 'high',
+            'location' => 'Silverio Compound, Sucat Road, Parañaque City',
+            'guardian_notes' => 'Child experiencing acute sensory crisis near Silverio Compound.',
+        ]);
+
+        $response->assertStatus(201);
+        $emergency = Emergency::find($response->json('id'));
+
+        $this->assertNotNull($emergency->lat);
+        $this->assertNotNull($emergency->lng);
+        // Coords should be near Silverio Compound (approx 14.478, 121.008)
+        $this->assertEqualsWithDelta(14.4780, $emergency->lat, 0.005);
+        $this->assertEqualsWithDelta(121.0085, $emergency->lng, 0.005);
+    }
+
+    public function test_alert_with_gps_coordinates_at_silverio_compound_reverse_geocodes_to_san_isidro(): void
+    {
+        $guardian = User::factory()->create(['role' => 'guardian']);
+        $guardian->assignRole('guardian');
+
+        $child = ChildProfile::factory()->create([
+            'guardian_id' => $guardian->id,
+            'name' => 'Carla Dalisay',
+        ]);
+
+        // Emergency raised with GPS coordinates at Silverio Compound (lat: 14.4780, lng: 121.0085) without explicit location string
+        $raiseEmergency = app(RaiseEmergency::class);
+        $result = $raiseEmergency->execute([
+            'child_id' => $child->id,
+            'type' => 'wandering',
+            'urgency' => 'high',
+            'lat' => 14.4780,
+            'lng' => 121.0085,
+        ], $guardian);
+
+        $emergency = $result['emergency'];
+        $this->assertStringContainsString('Silverio Compound', $emergency->location);
+        $this->assertStringContainsString('San Isidro', $emergency->location);
+        $this->assertEquals(14.4780, $emergency->lat);
+        $this->assertEquals(121.0085, $emergency->lng);
+    }
+
+    public function test_geojson_point_in_polygon_allocates_exact_barangay_for_coordinates(): void
+    {
+        $geocodingService = app(GeocodingService::class);
+
+        // Silverio Compound in Barangay San Isidro
+        $sanIsidro = $geocodingService->findBarangayByCoordinates(14.4780, 121.0085);
+        $this->assertNotNull($sanIsidro);
+        $this->assertEquals('San Isidro', $sanIsidro['barangay']);
+        $this->assertEquals('District 1', $sanIsidro['district']);
+        $this->assertEquals('(02) 8825-6012', $sanIsidro['phone']);
+
+        // Aguirre Avenue in Barangay BF Homes
+        $bfHomes = $geocodingService->findBarangayByCoordinates(14.4532, 121.0189);
+        $this->assertNotNull($bfHomes);
+        $this->assertEquals('BF Homes', $bfHomes['barangay']);
+        $this->assertEquals('District 2', $bfHomes['district']);
     }
 }

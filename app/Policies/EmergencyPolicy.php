@@ -12,7 +12,7 @@ class EmergencyPolicy
      */
     public function view(User $user, Emergency $emergency): bool
     {
-        if (in_array(strtolower((string) $user->role), ['admin', 'staff', 'responder'], true)) {
+        if (in_array(strtolower((string) $user->role), ['superadmin', 'admin', 'responder'], true)) {
             return true;
         }
 
@@ -24,7 +24,7 @@ class EmergencyPolicy
      */
     public function update(User $user, Emergency $emergency): bool
     {
-        if (in_array(strtolower((string) $user->role), ['admin', 'staff', 'responder'], true)) {
+        if (in_array(strtolower((string) $user->role), ['superadmin', 'admin', 'responder'], true)) {
             return true;
         }
 
@@ -36,11 +36,10 @@ class EmergencyPolicy
      */
     public function cancel(User $user, Emergency $emergency): bool
     {
-        if (in_array(strtolower((string) $user->role), ['admin', 'staff'], true)) {
+        if (in_array(strtolower((string) $user->role), ['superadmin', 'admin'], true)) {
             return true;
         }
 
         return $user->id === $emergency->guardian_id;
     }
 }
-

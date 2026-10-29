@@ -61,7 +61,7 @@ return new class extends Migration
             Schema::table('emergencies', function (Blueprint $table) {
                 $table->foreignId('child_id')->nullable()->change();
             });
-        } catch (\Throwable $e) {
+        } catch (Throwable $e) {
             // Some drivers (older SQLite) may skip in-place nullability changes if already compatible
         }
     }
@@ -100,4 +100,3 @@ return new class extends Migration
         });
     }
 };
-

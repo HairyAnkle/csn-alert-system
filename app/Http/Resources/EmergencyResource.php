@@ -17,7 +17,10 @@ class EmergencyResource extends JsonResource
         return [
             'id' => $this->id,
             'type' => $this->type,
+            'urgency' => $this->urgency ?? 'high',
             'status' => $this->status, // pending | responding | resolved | cancelled
+            'message' => $this->guardian_notes ?? '',
+            'guardian_notes' => $this->guardian_notes ?? '',
             'lat' => $this->lat !== null ? (float) $this->lat : null,
             'lng' => $this->lng !== null ? (float) $this->lng : null,
             'location' => $this->location,
@@ -25,11 +28,10 @@ class EmergencyResource extends JsonResource
                 'id' => $this->responder->id,
                 'name' => $this->responder->name,
                 'unit' => $this->responder->unit ?? $this->responder->name,
-                'eta'  => $this->eta ?? '5-10 mins',
+                'eta' => $this->eta ?? '5-10 mins',
                 'phone' => $this->responder->phone ?? '',
             ] : null,
             'reported_at' => $this->reported_at?->toIso8601String() ?? $this->created_at?->toIso8601String(), // keep UTC
         ];
     }
 }
-

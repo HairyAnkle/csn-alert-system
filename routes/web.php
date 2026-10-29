@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnnouncementController;
 use App\Http\Controllers\ChildProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\EmergencyController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\IncidentReportController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingController;
+use App\Http\Controllers\SupportChatController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,7 +38,11 @@ Route::middleware(['auth', 'prevent_back_history'])->group(function () {
 
     Route::get('/settings', [SettingController::class, 'show'])->name('settings.show');
     Route::patch('/settings', [SettingController::class, 'update'])->name('settings.update');
-    Route::post('/announcements', [\App\Http\Controllers\AnnouncementController::class, 'store'])->name('announcements.store');
+    Route::post('/announcements', [AnnouncementController::class, 'store'])->name('announcements.store');
+
+    Route::get('/support/threads', [SupportChatController::class, 'threads'])->name('support.threads');
+    Route::get('/support/threads/{guardian}/messages', [SupportChatController::class, 'messages'])->name('support.messages');
+    Route::post('/support/threads/{guardian}/messages', [SupportChatController::class, 'reply'])->name('support.reply');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

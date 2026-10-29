@@ -42,10 +42,12 @@ class UserController extends Controller
     {
         $this->authorizeAdmin($request->user());
 
+        $this->normalizeRoleInput($request);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'role' => ['required', 'string', 'in:admin,staff,responder,guardian'],
+            'role' => ['required', 'string', 'in:superadmin,admin,client_admin,responder,guardian,staff'],
             'phone' => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
             'is_active' => ['nullable', 'boolean'],
@@ -55,6 +57,10 @@ class UserController extends Controller
             'child_ids.*' => ['exists:child_profiles,id'],
         ]);
 
+        $role = match ($validated['role']) {
+            'staff', 'client_admin' => 'admin',
+            default => $validated['role'],
+        };
         $isActive = $validated['is_active'] ?? ($validated['status'] ?? 'active') === 'active';
         $status = $isActive ? 'active' : 'inactive';
         $password = ! empty($validated['password'])
@@ -64,14 +70,14 @@ class UserController extends Controller
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
-            'role' => $validated['role'],
+            'role' => $role,
             'phone' => $validated['phone'] ?? null,
             'status' => $status,
             'is_active' => $isActive,
             'password' => $password,
         ]);
 
-        $user->assignRole($validated['role']);
+        $user->assignRole($role);
 
         if (! empty($validated['child_ids'])) {
             ChildProfile::whereIn('id', $validated['child_ids'])->update([
@@ -110,10 +116,12 @@ class UserController extends Controller
     {
         $this->authorizeAdmin($request->user());
 
+        $this->normalizeRoleInput($request);
+
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => ['sometimes', 'required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
-            'role' => ['nullable', 'string', 'in:admin,staff,responder,guardian'],
+            'role' => ['nullable', 'string', 'in:superadmin,admin,client_admin,responder,guardian,staff'],
             'phone' => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
             'is_active' => ['nullable', 'boolean'],
@@ -141,8 +149,9 @@ class UserController extends Controller
         }
 
         if (! empty($validated['role'])) {
-            $updates['role'] = $validated['role'];
-            $user->syncRoles([$validated['role']]);
+            $role = $validated['role'] === 'staff' ? 'admin' : $validated['role'];
+            $updates['role'] = $role;
+            $user->syncRoles([$role]);
         }
 
         $user->update($updates);
@@ -196,6 +205,25 @@ class UserController extends Controller
     }
 
     /**
+     * Normalize role input from frontend dropdown or API.
+     */
+    protected function normalizeRoleInput(Request $request): void
+    {
+        if ($request->has('role') && ! empty($request->input('role'))) {
+            $raw = strtolower(trim((string) $request->input('role')));
+            $normalized = match (true) {
+                str_contains($raw, 'super') => 'superadmin',
+                str_contains($raw, 'admin') => 'admin',
+                str_contains($raw, 'guard') => 'guardian',
+                str_contains($raw, 'respond') => 'responder',
+                str_contains($raw, 'staff') || str_contains($raw, 'teacher') => 'admin',
+                default => $raw,
+            };
+            $request->merge(['role' => $normalized]);
+        }
+    }
+
+    /**
      * Ensure the requesting user has the administrator role.
      */
     protected function authorizeAdmin(?User $user): void
@@ -204,9 +232,10 @@ class UserController extends Controller
             abort(401, 'Authentication required.');
         }
 
-        $isAdmin = $user->hasRole('admin') || strtolower((string) $user->role) === 'admin';
-        if (! $isAdmin) {
-            abort(403, 'Unauthorized. Administrator access required.');
+        $isSuperadmin = $user->hasRole('superadmin')
+            || strtolower((string) $user->role) === 'superadmin';
+        if (! $isSuperadmin) {
+            abort(403, 'Unauthorized. Superadmin access required.');
         }
     }
 }

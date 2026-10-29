@@ -160,16 +160,27 @@
             </div>
         </div>
 
-        {{-- User Avatar Initials --}}
-        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-700 text-xs font-bold text-white shadow-sm"
-             style="background-color: #005B96;"
-             x-text="currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'AG'">
-        </div>
+        {{-- User Avatar Initials (Click to Sign Out) --}}
+        <button type="button"
+                @click="activeModal = 'confirmLogout'"
+                class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-700 text-xs font-bold text-white shadow-sm hover:ring-2 hover:ring-brand-500 focus-ring transition cursor-pointer"
+                style="background-color: #005B96;"
+                :title="(currentUser.name || 'Admin') + ' · Click to Sign Out'"
+                x-text="currentUser.name ? currentUser.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'AD'">
+        </button>
 
-        {{-- Live Telemetry / Action Badge --}}
-        <div class="hidden sm:inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm">
+        {{-- Live Telemetry / Monitoring Badge with Instant Refresh --}}
+        <div class="inline-flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-3 py-1.5 text-xs font-semibold text-emerald-700 shadow-sm"
+             title="System is connected and active. Click icon to refresh now.">
             <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Live System</span>
+            <span class="hidden sm:inline">Live Monitoring</span>
+            <button type="button" @click="pollEmergencies(true)"
+                    class="rounded p-0.5 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-900 transition focus-ring"
+                    title="Refresh alerts now">
+                <svg class="h-3.5 w-3.5" :class="{ 'animate-spin': isPollingEmergencies }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+                </svg>
+            </button>
         </div>
     </div>
 </header>

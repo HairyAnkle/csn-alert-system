@@ -1,10 +1,16 @@
 {{-- ============ MODULE 3: CHILD PROFILE MANAGEMENT ============ --}}
-<div class="space-y-5">
+<div>
+<div x-show="currentTab === 'children'" x-cloak class="space-y-5">
 
     {{-- Search + add --}}
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="relative w-full sm:max-w-sm">
-            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                </svg>
+            </div>
             <input
                 type="text"
                 x-model="childSearch"
@@ -73,6 +79,7 @@
             </table>
         </div>
     </div>
+</div>
 
     {{-- Slide-over: View Full Medical Profile --}}
     <div x-show="activeModal === 'viewChild'" x-cloak class="fixed inset-0 z-50" aria-modal="true" role="dialog">
@@ -185,7 +192,7 @@
                                 </p>
                                 <span class="text-[10px] text-amber-700/80 font-mono">RA 10173 Audit Logged</span>
                             </div>
-                            <p class="text-sm leading-relaxed text-slate-700 whitespace-pre-line" x-text="activeChild.notes || 'No confidential medical notes recorded.'"></p>
+                            <p class="text-sm leading-relaxed text-slate-700 whitespace-pre-line" x-text="formatMedicalNotes(activeChild.notes)"></p>
                         </div>
                     </div>
 

@@ -16,8 +16,11 @@ class WebDashboardSection74Test extends TestCase
     use RefreshDatabase;
 
     protected User $admin;
+
     protected User $staff;
+
     protected User $responder;
+
     protected User $guardian;
 
     protected function setUp(): void
@@ -25,13 +28,13 @@ class WebDashboardSection74Test extends TestCase
         parent::setUp();
 
         $this->admin = User::factory()->create([
-            'email' => 'admin.sec74@csn.gov.ph',
-            'role' => 'admin',
+            'email' => 'superadmin.sec74@csn.gov.ph',
+            'role' => 'superadmin',
         ]);
 
         $this->staff = User::factory()->create([
-            'email' => 'staff.sec74@csn.gov.ph',
-            'role' => 'staff',
+            'email' => 'admin.sec74@csn.gov.ph',
+            'role' => 'admin',
         ]);
 
         $this->responder = User::factory()->create([
@@ -252,4 +255,3 @@ class WebDashboardSection74Test extends TestCase
         $response->assertViewHas('emergencies');
     }
 }
-

@@ -114,4 +114,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Initial Administrative Passwords
+    |--------------------------------------------------------------------------
+    |
+    | Seed passwords retrieved securely from .env.
+    |
+    */
+
+    'initial_passwords' => [
+        'superadmin' => env('SUPERADMIN_PASSWORD', 'fdph8nueVOGCrVEc'),
+        'admin' => env('ADMIN_PASSWORD', '95pu8sGpNQGEYtoQ'),
+    ],
+
 ];

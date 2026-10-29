@@ -9,6 +9,12 @@
         </div>
         <div class="flex flex-wrap gap-2">
             <button type="button"
+                    @click="currentTab = 'emergency'; activeModal = 'logEmergency'"
+                    class="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-brand-700 px-3.5 text-xs font-semibold text-white shadow-sm hover:bg-brand-800 focus-ring">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                Create New Report
+            </button>
+            <button type="button"
                     @click="triggerExport('pdf')"
                     class="inline-flex min-h-[42px] items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-400 focus-ring">
                 <svg class="h-4 w-4 text-rose-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
@@ -69,12 +75,17 @@
             <div>
                 <label class="mb-1 block text-xs font-semibold text-slate-600">Keyword Search</label>
                 <div class="relative">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-400">
+                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="11" cy="11" r="8"/>
+                            <path d="M21 21l-4.35-4.35"/>
+                        </svg>
+                    </div>
                     <input type="text"
                            x-model="incidentSearch"
                            @input.debounce.350ms="fetchIncidents()"
                            placeholder="Child, unit, notes..."
                            class="min-h-[40px] w-full rounded-lg border border-slate-300 bg-white pl-8 pr-3 text-xs text-slate-700 placeholder-slate-400 focus-ring">
-                    <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
                 </div>
             </div>
         </div>

@@ -2,7 +2,4 @@
 
 namespace App\Http\Controllers\Api;
 
-class ChildController extends ChildApiController
-{
-}
-
+class ChildController extends ChildApiController {}

@@ -33,19 +33,24 @@
                             <p class="text-sm font-semibold text-slate-800">Critical / High Urgency Alerts</p>
                         </div>
                         <p class="text-xs text-slate-500 mt-0.5">Pulsing alarm tone for medical crises and active wanderings.</p>
-                        <button type="button" @click="playAlertSound('high')"
+                        <button type="button" @click="playAlertSound('high', true)"
                                 class="mt-2 inline-flex items-center gap-1.5 rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200 focus-ring">
                             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                             Preview Alarm Sound
                         </button>
                     </div>
-                    <button type="button" role="switch" :aria-checked="settings.sound_on_high"
-                            @click="toggleSoundSetting('sound_on_high')"
-                            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-ring"
-                            :class="settings.sound_on_high ? 'bg-brand-700' : 'bg-slate-300'">
-                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition"
-                              :class="settings.sound_on_high ? 'translate-x-6' : 'translate-x-1'"></span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-semibold select-none w-7 text-right"
+                              :class="settings.sound_on_high ? 'text-emerald-700' : 'text-slate-400'"
+                              x-text="settings.sound_on_high ? 'ON' : 'OFF'"></span>
+                        <button type="button" role="switch" :aria-checked="settings.sound_on_high"
+                                @click="toggleSoundSetting('sound_on_high')"
+                                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus-ring"
+                                :class="settings.sound_on_high ? 'bg-emerald-600' : 'bg-slate-300'">
+                            <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ease-in-out"
+                                  :style="settings.sound_on_high ? 'transform: translateX(20px)' : 'transform: translateX(0px)'"></span>
+                        </button>
+                    </div>
                 </div>
 
                 {{-- Low Urgency Alert Toggle --}}
@@ -56,19 +61,24 @@
                             <p class="text-sm font-semibold text-slate-800">Routine / Low Urgency Alerts</p>
                         </div>
                         <p class="text-xs text-slate-500 mt-0.5">Gentle chime notification for standard assistance logs.</p>
-                        <button type="button" @click="playAlertSound('low')"
+                        <button type="button" @click="playAlertSound('low', true)"
                                 class="mt-2 inline-flex items-center gap-1.5 rounded bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200 focus-ring">
                             <svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
                             Preview Gentle Chime
                         </button>
                     </div>
-                    <button type="button" role="switch" :aria-checked="settings.sound_on_low"
-                            @click="toggleSoundSetting('sound_on_low')"
-                            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition focus-ring"
-                            :class="settings.sound_on_low ? 'bg-brand-700' : 'bg-slate-300'">
-                        <span class="inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition"
-                              :class="settings.sound_on_low ? 'translate-x-6' : 'translate-x-1'"></span>
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs font-semibold select-none w-7 text-right"
+                              :class="settings.sound_on_low ? 'text-emerald-700' : 'text-slate-400'"
+                              x-text="settings.sound_on_low ? 'ON' : 'OFF'"></span>
+                        <button type="button" role="switch" :aria-checked="settings.sound_on_low"
+                                @click="toggleSoundSetting('sound_on_low')"
+                                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus-ring"
+                                :class="settings.sound_on_low ? 'bg-emerald-600' : 'bg-slate-300'">
+                            <span class="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow-sm ring-0 transition-transform duration-200 ease-in-out"
+                                  :style="settings.sound_on_low ? 'transform: translateX(20px)' : 'transform: translateX(0px)'"></span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -84,18 +94,22 @@
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-slate-700">PDRRMO Emergency Desk</label>
                     <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        </div>
                         <input type="text" x-model="settings.hotline_pdrrmo" placeholder="e.g. (02) 8820-7377"
-                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-9 pr-3 font-mono text-xs focus-ring">
-                        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-10 pr-3 font-mono text-xs focus-ring">
                     </div>
                 </div>
 
                 <div>
                     <label class="mb-1 block text-xs font-semibold text-slate-700">Ambulance / Medical Unit</label>
                     <div class="relative">
+                        <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                        </div>
                         <input type="text" x-model="settings.hotline_ambulance" placeholder="e.g. 911 / (02) 8825-1022"
-                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-9 pr-3 font-mono text-xs focus-ring">
-                        <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                               class="min-h-[42px] w-full rounded-lg border border-slate-300 pl-10 pr-3 font-mono text-xs focus-ring">
                     </div>
                 </div>
 
@@ -172,6 +186,173 @@
             </div>
         </div>
 
+        {{-- Card: Two-Way Live Support Chat Desk (Guardian Mobile App <-> CSN Coordinator) --}}
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 space-y-4">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="relative flex h-2.5 w-2.5">
+                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                        </span>
+                        <h2 class="text-base font-bold text-slate-800">Parañaque CSN Center Live Support Chat</h2>
+                        <span class="rounded bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 ring-1 ring-emerald-200">
+                            Two-Way Mobile Chat
+                        </span>
+                        <span x-show="unreadSupportCount > 0" x-cloak
+                              class="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-bold text-white"
+                              x-text="unreadSupportCount + ' Unread'"></span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-0.5">Real-time two-way messaging with parents and guardians using the Parañaque CSN Mobile App.</p>
+                </div>
+                <button type="button" @click="pollSupportThreads()"
+                        class="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-ring">
+                    <svg class="h-3.5 w-3.5 text-brand-700" :class="isPollingSupport ? 'animate-spin' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                    <span>Refresh Inbox</span>
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[430px]">
+                {{-- Left Column: Guardian Threads List --}}
+                <div class="lg:col-span-4 flex flex-col rounded-xl border border-slate-200 bg-slate-50/70 overflow-hidden">
+                    <div class="p-3 border-b border-slate-200 bg-white">
+                        <div class="relative">
+                            <svg class="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                            <input type="text" x-model="supportSearch" placeholder="Search guardian or child..."
+                                   class="min-h-[36px] w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-700 placeholder-slate-400 focus-ring">
+                        </div>
+                    </div>
+
+                    <div class="flex-1 overflow-y-auto max-h-[380px] divide-y divide-slate-200/70">
+                        <template x-for="thread in filteredSupportThreads" :key="thread.guardian_id">
+                            <button type="button"
+                                    @click="selectSupportThread(thread.guardian_id)"
+                                    class="w-full text-left p-3.5 transition flex items-start gap-3 hover:bg-white focus-ring"
+                                    :class="activeSupportThread && activeSupportThread.guardian_id === thread.guardian_id ? 'bg-white border-l-4 border-l-brand-700 shadow-xs' : ''">
+                                <div class="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white"
+                                     x-text="thread.avatar_initials">
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center justify-between gap-1">
+                                        <p class="truncate text-xs font-bold text-slate-800" x-text="thread.guardian_name"></p>
+                                        <span x-show="thread.unread_count > 0"
+                                              class="inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-600 px-1.5 text-[10px] font-bold text-white"
+                                              x-text="thread.unread_count"></span>
+                                    </div>
+                                    <p class="truncate text-[11px] font-medium text-brand-700"
+                                       x-text="'Child: ' + thread.child_name + (thread.child_condition && thread.child_condition !== '—' ? ' (' + thread.child_condition + ')' : '')"></p>
+                                    <p class="mt-1 truncate text-[11px] text-slate-500"
+                                       :class="thread.unread_count > 0 ? 'font-semibold text-slate-800' : ''"
+                                       x-text="thread.last_message_text"></p>
+                                </div>
+                            </button>
+                        </template>
+
+                        <div x-show="filteredSupportThreads.length === 0" class="p-6 text-center text-xs text-slate-400">
+                            No guardian conversations found.
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Right Column: Active Conversation Window --}}
+                <div class="lg:col-span-8 flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden">
+                    <template x-if="activeSupportThread">
+                        <div class="flex flex-1 flex-col h-full">
+                            {{-- Conversation Header --}}
+                            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                                <div class="flex items-center gap-3">
+                                    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-700 text-xs font-bold text-white"
+                                         x-text="activeSupportThread.avatar_initials"></div>
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <h3 class="text-sm font-bold text-slate-800" x-text="activeSupportThread.guardian_name"></h3>
+                                            <span class="rounded bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200"
+                                                  x-text="activeSupportThread.guardian_phone"></span>
+                                        </div>
+                                        <p class="text-xs text-slate-500"
+                                           x-text="'Child: ' + activeSupportThread.child_name + ' · ' + activeSupportThread.child_condition"></p>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-2">
+                                    <template x-if="activeSupportThread.child_id">
+                                        <button type="button" @click="viewChildProfile(activeSupportThread.child_id)"
+                                                class="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 focus-ring">
+                                            <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                            <span>Child Medical File</span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
+
+                            {{-- Messages Feed --}}
+                            <div id="support-chat-scroll" class="flex-1 overflow-y-auto max-h-[280px] min-h-[240px] p-4 space-y-3 bg-slate-50/50">
+                                <template x-if="!activeSupportThread.messages || activeSupportThread.messages.length === 0">
+                                    <div class="flex h-48 flex-col items-center justify-center text-center text-xs text-slate-400">
+                                        <p class="font-semibold text-slate-600">No messages in this conversation yet.</p>
+                                        <p class="mt-1">Send a message below to reach <span x-text="activeSupportThread.guardian_name"></span> on the CSN Mobile App.</p>
+                                    </div>
+                                </template>
+
+                                <template x-for="msg in (activeSupportThread.messages || [])" :key="msg.id">
+                                    <div class="flex flex-col" :class="msg.sender === 'support' ? 'items-end' : 'items-start'">
+                                        <div class="max-w-[82%] rounded-2xl px-3.5 py-2.5 text-xs shadow-xs"
+                                             :class="msg.sender === 'support'
+                                                ? 'bg-brand-700 text-white rounded-br-xs'
+                                                : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs'">
+                                            <div class="flex items-center justify-between gap-3 mb-1">
+                                                <span class="font-bold text-[10px]"
+                                                      :class="msg.sender === 'support' ? 'text-brand-100' : 'text-brand-700'"
+                                                      x-text="msg.sender_name"></span>
+                                                <span class="text-[10px] opacity-75"
+                                                      x-text="msg.time_formatted || ''"></span>
+                                            </div>
+                                            <p class="leading-relaxed whitespace-pre-line" x-text="msg.text"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+
+                            {{-- Quick Reply Chips & Input Form --}}
+                            <div class="border-t border-slate-200 bg-white p-3 space-y-2.5">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <template x-for="preset in [
+                                        'Mabuhay! How can the Parañaque CSN Desk assist you today?',
+                                        'We have noted your child’s update in our CSN Coordination Desk.',
+                                        'A CSN Social Welfare Coordinator will call your phone number shortly.',
+                                        'For immediate medical or wandering emergencies, please press the red SOS button.'
+                                    ]" :key="preset">
+                                        <button type="button" @click="supportReplyText = preset"
+                                                class="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-200 transition"
+                                                x-text="preset"></button>
+                                    </template>
+                                </div>
+
+                                <form @submit.prevent="sendSupportReply()" class="flex items-center gap-2">
+                                    <input type="text"
+                                           x-model="supportReplyText"
+                                           placeholder="Type your reply to the guardian's mobile app..."
+                                           class="min-h-[42px] flex-1 rounded-lg border border-slate-300 px-3.5 text-xs text-slate-800 placeholder-slate-400 focus-ring">
+                                    <button type="submit"
+                                            :disabled="isSendingSupportReply || !supportReplyText.trim()"
+                                            class="inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-lg bg-brand-700 px-4 text-xs font-semibold text-white shadow-sm hover:bg-brand-800 focus-ring disabled:opacity-50">
+                                        <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                        <span x-text="isSendingSupportReply ? 'Sending...' : 'Send Reply'"></span>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </template>
+
+                    <template x-if="!activeSupportThread">
+                        <div class="flex flex-1 items-center justify-center p-8 text-center text-xs text-slate-400">
+                            Select a guardian conversation on the left to view and reply to support messages.
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
         {{-- Card 3: Support, Help Desk & Operational Guide --}}
         <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2 space-y-4">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
@@ -207,12 +388,12 @@
 
             {{-- Guide Content: Dispatch --}}
             <div x-show="activeGuide === 'alerts'" class="rounded-lg bg-slate-50 p-4 text-xs text-slate-700 space-y-2">
-                <h3 class="font-bold text-slate-800 text-sm">Emergency Dispatch Protocol</h3>
-                <p>When an emergency is logged, real-time broadcasts alert all active personnel through Laravel Reverb WebSockets with synthesized audio chimes. High-urgency alerts prioritize medical crises and elopements.</p>
+                <h3 class="font-bold text-slate-800 text-sm">Emergency Dispatch &amp; Barangay Coordination Protocol</h3>
+                <p>When an emergency is triggered from the Guardian Mobile App, real-time broadcasts alert the Web Command Center with synthesized audio chimes. High-urgency alerts prioritize medical crises and elopements.</p>
                 <ul class="list-disc pl-5 space-y-1 text-slate-600">
-                    <li><strong>Acknowledge:</strong> CSN desk confirms receipt of emergency report within 60 seconds.</li>
-                    <li><strong>Dispatch:</strong> Assigns nearest PDRRMO responder unit and immediately sends automated SMS dispatch details with child medical background.</li>
-                    <li><strong>Resolution:</strong> Responding unit marks alert resolved and inputs an After-Action Review (AAR) summary note for reporting.</li>
+                    <li><strong>Acknowledge:</strong> Client Admin confirms receipt of the emergency alert within 60 seconds and inspects the child's decrypted medical profile and sensory de-escalation protocol.</li>
+                    <li><strong>Coordinate &amp; Dispatch Barangay Responder:</strong> Admin calls the guardian's allocated or nearest Parañaque Barangay Emergency Response Team, briefs them on the sensory protocol, and configures the agreed <strong>Estimated Time of Arrival (ETA)</strong> in the Dispatch Modal to immediately notify the Guardian's Mobile App.</li>
+                    <li><strong>Resolution:</strong> Once the Barangay responders confirm on-site stabilization, Admin marks the incident resolved and logs an After-Action Review (AAR) summary note for archival reporting.</li>
                 </ul>
             </div>
 
@@ -243,8 +424,8 @@
             </div>
         </div>
 
-        {{-- Card 4: ISO 27001 Audit Log (Admin Only, Tamper-Evident, Read-Only) --}}
-        @if(auth()->check() && (auth()->user()->hasRole('admin') || auth()->user()->role === 'admin'))
+        {{-- Card 4: ISO 27001 Audit Log (Superadmin Only, Tamper-Evident, Read-Only) --}}
+        @if(auth()->check() && (auth()->user()->hasRole('superadmin') || auth()->user()->role === 'superadmin'))
             <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
                 <div class="mb-4 flex items-center justify-between border-b border-slate-100 pb-3">
                     <div>

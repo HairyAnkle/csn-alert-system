@@ -113,6 +113,33 @@ class ChildProfile extends Model
      */
     public function toFrontendArray(bool $includeSensitive = true): array
     {
+        $rawNotes = $this->medical_notes;
+        $decodedJson = null;
+
+        if (is_string($rawNotes) && str_starts_with(trim($rawNotes), '{') && str_ends_with(trim($rawNotes), '}')) {
+            $parsed = json_decode($rawNotes, true);
+            if (is_array($parsed)) {
+                $decodedJson = $parsed;
+            }
+        }
+
+        $clinicalNotes = null;
+        if ($decodedJson !== null) {
+            $clinicalNotes = $decodedJson['medical_notes']
+                ?? $decodedJson['notes']
+                ?? $decodedJson['clinical_notes']
+                ?? null;
+        } else {
+            $clinicalNotes = $rawNotes;
+        }
+
+        $allergies = $this->allergies ?: ($decodedJson['allergies'] ?? null);
+        $medications = $this->medications ?: ($decodedJson['medications'] ?? null);
+        $communicationNotes = $this->communication_notes ?: ($decodedJson['communication_notes'] ?? null);
+        $emergencyContactName = $this->emergency_contact_name ?: ($decodedJson['emergency_contact_name'] ?? null);
+        $emergencyContactPhone = $this->emergency_contact_phone ?: ($decodedJson['emergency_contact_phone'] ?? null);
+        $guardianPhone = $this->guardian_phone ?: ($decodedJson['guardian_phone'] ?? null);
+
         return [
             'id' => $this->id,
             'name' => $this->name,
@@ -122,16 +149,16 @@ class ChildProfile extends Model
             'address' => $this->address ?? 'Parañaque City',
             'guardian_id' => $this->guardian_id,
             'guardian' => $this->guardian?->name ?? $this->guardian_name ?? '—',
-            'guardian_phone' => $this->guardian_phone ?? $this->guardian?->phone ?? '—',
-            'contact' => $this->emergency_contact_phone ?? $this->emergency_contact ?? $this->guardian?->phone ?? '—',
-            'emergency_contact' => $this->emergency_contact ?? $this->emergency_contact_phone ?? '—',
-            'emergency_contact_name' => $this->emergency_contact_name ?? 'Primary Contact',
-            'emergency_contact_phone' => $this->emergency_contact_phone ?? $this->emergency_contact ?? '—',
-            'allergies' => $includeSensitive ? ($this->allergies ?? 'None reported') : null,
-            'medications' => $includeSensitive ? ($this->medications ?? 'None recorded') : null,
-            'communication_notes' => $includeSensitive ? ($this->communication_notes ?? 'No communication notes') : null,
-            'notes' => $includeSensitive ? ($this->medical_notes ?? 'No notes recorded.') : null,
-            'hasNotes' => ! empty($this->medical_notes) || ! empty($this->allergies) || ! empty($this->medications) || ! empty($this->communication_notes),
+            'guardian_phone' => $guardianPhone ?? $this->guardian?->phone ?? '—',
+            'contact' => $emergencyContactPhone ?? $this->emergency_contact ?? $this->guardian?->phone ?? '—',
+            'emergency_contact' => $this->emergency_contact ?? $emergencyContactPhone ?? '—',
+            'emergency_contact_name' => $emergencyContactName ?? 'Primary Contact',
+            'emergency_contact_phone' => $emergencyContactPhone ?? $this->emergency_contact ?? '—',
+            'allergies' => $includeSensitive ? ($allergies ?? 'None reported') : null,
+            'medications' => $includeSensitive ? ($medications ?? 'None recorded') : null,
+            'communication_notes' => $includeSensitive ? ($communicationNotes ?? 'No communication notes') : null,
+            'notes' => $includeSensitive ? ($clinicalNotes ?: 'No confidential medical notes recorded.') : null,
+            'hasNotes' => ! empty($clinicalNotes) || ! empty($allergies) || ! empty($medications) || ! empty($communicationNotes),
             'avatarInitials' => $this->avatar_initials,
             'photoPath' => $this->photo_path,
             'photoUrl' => $this->photo_url,

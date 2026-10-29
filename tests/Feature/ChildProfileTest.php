@@ -37,8 +37,8 @@ class ChildProfileTest extends TestCase
     {
         Storage::fake('public');
 
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $photo = UploadedFile::fake()->image('mateo.jpg', 200, 200);
 
@@ -76,8 +76,8 @@ class ChildProfileTest extends TestCase
 
     public function test_authenticated_user_can_search_children_by_address_name_condition(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         ChildProfile::factory()->create([
             'name' => 'Bea Cruz',
@@ -106,8 +106,8 @@ class ChildProfileTest extends TestCase
 
     public function test_authorized_user_can_view_full_profile_and_logs_dpa_audit(): void
     {
-        $staff = User::factory()->create(['role' => 'staff', 'name' => 'Officer Reyes']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin', 'name' => 'Officer Reyes']);
+        $staff->assignRole('admin');
 
         $child = ChildProfile::factory()->create([
             'name' => 'Lucas Gomez',
@@ -165,8 +165,8 @@ class ChildProfileTest extends TestCase
 
     public function test_staff_can_update_child_profile(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $child = ChildProfile::factory()->create([
             'address' => 'Old Address, Parañaque City',
@@ -184,8 +184,8 @@ class ChildProfileTest extends TestCase
 
     public function test_staff_can_delete_child_profile(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
 
         $child = ChildProfile::factory()->create();
 
@@ -193,5 +193,44 @@ class ChildProfileTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertDatabaseMissing('child_profiles', ['id' => $child->id]);
+    }
+
+    public function test_child_profile_decodes_legacy_medical_notes_json_cleanly(): void
+    {
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
+
+        $child = ChildProfile::factory()->create([
+            'medical_notes' => json_encode([
+                'allergies' => 'None',
+                'medications' => 'None',
+                'communication_notes' => 'None',
+                'emergency_contact_phone' => '09170001122',
+            ]),
+        ]);
+
+        $response = $this->actingAs($staff)->getJson("/children/{$child->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('notes', 'No confidential medical notes recorded.');
+        $this->assertStringNotContainsString('{', $response->json('notes'));
+    }
+
+    public function test_child_profile_preserves_real_medical_notes_from_json_if_present(): void
+    {
+        $staff = User::factory()->create(['role' => 'admin']);
+        $staff->assignRole('admin');
+
+        $child = ChildProfile::factory()->create([
+            'medical_notes' => json_encode([
+                'allergies' => 'Dust',
+                'medical_notes' => 'Patient has severe bronchial asthma protocols.',
+            ]),
+        ]);
+
+        $response = $this->actingAs($staff)->getJson("/children/{$child->id}");
+
+        $response->assertStatus(200);
+        $response->assertJsonPath('notes', 'Patient has severe bronchial asthma protocols.');
     }
 }

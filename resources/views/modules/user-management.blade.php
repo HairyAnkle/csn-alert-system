@@ -4,7 +4,12 @@
     {{-- Top controls: Search, Role filters, and Add User button --}}
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div class="relative w-full sm:max-w-sm">
-            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/>
+                    <path d="M21 21l-4.35-4.35"/>
+                </svg>
+            </div>
             <input
                 type="text"
                 x-model="userSearch"
@@ -23,10 +28,10 @@
     <div class="flex flex-wrap gap-2" role="tablist" aria-label="Filter by role">
         @foreach ([
             ['key' => 'all', 'label' => 'All Users'],
-            ['key' => 'guardian', 'label' => 'Guardians'],
-            ['key' => 'staff', 'label' => 'CSN Staff / Teachers'],
-            ['key' => 'responder', 'label' => 'Responders'],
-            ['key' => 'admin', 'label' => 'Administrators']
+            ['key' => 'superadmin', 'label' => 'Superadmin'],
+            ['key' => 'admin', 'label' => 'Client Admins'],
+            ['key' => 'guardian', 'label' => 'Guardians (Mobile App)'],
+            ['key' => 'responder', 'label' => 'Barangay Responders'],
         ] as $r)
             <button type="button" @click="roleTab = '{{ $r['key'] }}'"
                     class="min-h-[40px] rounded-full px-4 text-sm font-medium transition focus-ring"
@@ -59,9 +64,9 @@
                                     <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white uppercase shadow-sm"
                                          :class="{
                                              'bg-sky-600': user.role === 'guardian',
-                                             'bg-brand-700': user.role === 'staff',
+                                             'bg-brand-700': user.role === 'admin',
                                              'bg-amber-600': user.role === 'responder',
-                                             'bg-purple-700': user.role === 'admin'
+                                             'bg-purple-700': user.role === 'superadmin'
                                          }"
                                          x-text="(user.name || '?').split(' ').map(n => n[0]).slice(0, 2).join('')">
                                     </div>
@@ -77,11 +82,11 @@
                                 <span class="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold capitalize"
                                       :class="{
                                           'bg-sky-50 text-sky-700 ring-1 ring-sky-200': user.role === 'guardian',
-                                          'bg-brand-50 text-brand-800 ring-1 ring-brand-200': user.role === 'staff',
+                                          'bg-brand-50 text-brand-800 ring-1 ring-brand-200': user.role === 'admin',
                                           'bg-amber-50 text-amber-700 ring-1 ring-amber-200': user.role === 'responder',
-                                          'bg-purple-50 text-purple-700 ring-1 ring-purple-200': user.role === 'admin'
+                                          'bg-purple-50 text-purple-700 ring-1 ring-purple-200': user.role === 'superadmin'
                                       }"
-                                      x-text="user.role"></span>
+                                      x-text="user.role === 'superadmin' ? 'Superadmin' : (user.role === 'admin' ? 'Client Admin' : (user.role === 'responder' ? 'Barangay Responder' : (user.role === 'guardian' ? 'Guardian (Mobile)' : user.role)))"></span>
                             </td>
 
                             {{-- Phone --}}
@@ -177,10 +182,10 @@
                     <div>
                         <label class="mb-1 block text-xs font-semibold text-slate-700">System Role <span class="text-rose-500">*</span></label>
                         <select x-model="newUser.role" class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
-                            <option value="staff">CSN Staff / Teacher</option>
-                            <option value="guardian">Guardian</option>
-                            <option value="responder">Emergency Responder</option>
-                            <option value="admin">Administrator</option>
+                            <option value="admin">Client Admin (Web Command Center)</option>
+                            <option value="superadmin">Superadmin (System Developer / Owner)</option>
+                            <option value="guardian">Guardian (Mobile App User)</option>
+                            <option value="responder">Barangay Responder Unit</option>
                         </select>
                     </div>
                     <div>
@@ -281,10 +286,10 @@
                             <div>
                                 <label class="mb-1 block text-xs font-semibold text-slate-700">System Role</label>
                                 <select x-model="editUser.role" class="min-h-[42px] w-full rounded-lg border border-slate-300 px-3 text-sm focus-ring">
-                                    <option value="staff">CSN Staff / Teacher</option>
-                                    <option value="guardian">Guardian</option>
-                                    <option value="responder">Emergency Responder</option>
-                                    <option value="admin">Administrator</option>
+                                    <option value="admin">Client Admin (Web Command Center)</option>
+                                    <option value="superadmin">Superadmin (System Developer / Owner)</option>
+                                    <option value="guardian">Guardian (Mobile App User)</option>
+                                    <option value="responder">Barangay Responder Unit</option>
                                 </select>
                             </div>
                             <div>

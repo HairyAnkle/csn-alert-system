@@ -22,16 +22,16 @@ class UserManagementTest extends TestCase
         $this->seed(RoleSeeder::class);
     }
 
-    protected function createAdmin(): User
+    protected function createSuperadmin(): User
     {
-        $admin = User::factory()->create([
-            'role' => 'admin',
+        $superadmin = User::factory()->create([
+            'role' => 'superadmin',
             'is_active' => true,
             'status' => 'active',
         ]);
-        $admin->assignRole('admin');
+        $superadmin->assignRole('superadmin');
 
-        return $admin;
+        return $superadmin;
     }
 
     public function test_unauthenticated_user_cannot_access_user_endpoints(): void
@@ -41,20 +41,20 @@ class UserManagementTest extends TestCase
         $this->postJson('/users', [
             'name' => 'John Doe',
             'email' => 'john@csn.gov.ph',
-            'role' => 'staff',
+            'role' => 'admin',
         ])->assertStatus(401);
     }
 
-    public function test_non_admin_cannot_access_user_management(): void
+    public function test_non_superadmin_admin_cannot_access_user_management(): void
     {
-        $staff = User::factory()->create(['role' => 'staff']);
-        $staff->assignRole('staff');
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
 
-        $this->actingAs($staff)
+        $this->actingAs($admin)
             ->getJson('/users')
             ->assertStatus(403);
 
-        $this->actingAs($staff)
+        $this->actingAs($admin)
             ->postJson('/users', [
                 'name' => 'Jane Responder',
                 'email' => 'jane@csn.gov.ph',
@@ -63,50 +63,50 @@ class UserManagementTest extends TestCase
             ->assertStatus(403);
     }
 
-    public function test_admin_can_list_users_and_filter_by_role(): void
+    public function test_superadmin_can_list_users_and_filter_by_role(): void
     {
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
 
-        $staffUser = User::factory()->create(['name' => 'Staff Member', 'role' => 'staff']);
-        $staffUser->assignRole('staff');
+        $adminUser = User::factory()->create(['name' => 'Admin Member', 'role' => 'admin']);
+        $adminUser->assignRole('admin');
 
         $responderUser = User::factory()->create(['name' => 'Rescue Unit', 'role' => 'responder']);
         $responderUser->assignRole('responder');
 
-        $response = $this->actingAs($admin)->getJson('/users');
+        $response = $this->actingAs($superadmin)->getJson('/users');
         $response->assertOk();
-        $response->assertJsonFragment(['name' => 'Staff Member']);
+        $response->assertJsonFragment(['name' => 'Admin Member']);
         $response->assertJsonFragment(['name' => 'Rescue Unit']);
 
-        $filteredResponse = $this->actingAs($admin)->getJson('/users?role=staff');
+        $filteredResponse = $this->actingAs($superadmin)->getJson('/users?role=admin');
         $filteredResponse->assertOk();
-        $filteredResponse->assertJsonFragment(['name' => 'Staff Member']);
+        $filteredResponse->assertJsonFragment(['name' => 'Admin Member']);
         $filteredResponse->assertJsonMissing(['name' => 'Rescue Unit']);
     }
 
-    public function test_admin_can_create_user_and_dispatches_signed_invitation_notification(): void
+    public function test_superadmin_can_create_user_and_dispatches_signed_invitation_notification(): void
     {
         Notification::fake();
 
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
 
         $payload = [
             'name' => 'Maria Santos',
             'email' => 'maria.santos@csn.gov.ph',
-            'role' => 'staff',
+            'role' => 'admin',
             'phone' => '+63 917 111 2222',
             'status' => 'active',
             'send_invite' => true,
         ];
 
-        $response = $this->actingAs($admin)->postJson('/users', $payload);
+        $response = $this->actingAs($superadmin)->postJson('/users', $payload);
 
         $response->assertStatus(201);
-        $response->assertJsonFragment(['name' => 'Maria Santos', 'role' => 'staff']);
+        $response->assertJsonFragment(['name' => 'Maria Santos', 'role' => 'admin']);
 
         $user = User::where('email', 'maria.santos@csn.gov.ph')->first();
         $this->assertNotNull($user);
-        $this->assertTrue($user->hasRole('staff'));
+        $this->assertTrue($user->hasRole('admin'));
         $this->assertTrue($user->is_active);
 
         Notification::assertSentTo($user, UserInvitationNotification::class, function ($notification) {
@@ -114,9 +114,9 @@ class UserManagementTest extends TestCase
         });
     }
 
-    public function test_admin_can_create_guardian_and_link_child_profiles(): void
+    public function test_superadmin_can_create_guardian_and_link_child_profiles(): void
     {
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
 
         $child1 = ChildProfile::create([
             'name' => 'Timmy Cruz',
@@ -140,7 +140,7 @@ class UserManagementTest extends TestCase
             'child_ids' => [$child1->id, $child2->id],
         ];
 
-        $response = $this->actingAs($admin)->postJson('/users', $payload);
+        $response = $this->actingAs($superadmin)->postJson('/users', $payload);
         $response->assertStatus(201);
 
         $guardian = User::where('email', 'elena.cruz@example.com')->first();
@@ -151,17 +151,17 @@ class UserManagementTest extends TestCase
         $this->assertEquals($guardian->id, $child2->fresh()->guardian_id);
     }
 
-    public function test_admin_can_update_user_role_status_and_linked_children(): void
+    public function test_superadmin_can_update_user_role_status_and_linked_children(): void
     {
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
 
         $user = User::factory()->create([
             'name' => 'Original Name',
             'email' => 'original@csn.gov.ph',
-            'role' => 'staff',
+            'role' => 'admin',
             'is_active' => true,
         ]);
-        $user->assignRole('staff');
+        $user->assignRole('admin');
 
         $child = ChildProfile::create([
             'name' => 'Leo Valdez',
@@ -177,7 +177,7 @@ class UserManagementTest extends TestCase
             'child_ids' => [$child->id],
         ];
 
-        $response = $this->actingAs($admin)->patchJson("/users/{$user->id}", $updatePayload);
+        $response = $this->actingAs($superadmin)->patchJson("/users/{$user->id}", $updatePayload);
         $response->assertOk();
 
         $user->refresh();
@@ -271,28 +271,53 @@ class UserManagementTest extends TestCase
         $this->get("/invitation/{$user->id}?signature=invalid123")->assertStatus(403);
     }
 
-    public function test_admin_can_resend_invitation_notification(): void
+    public function test_superadmin_can_resend_invitation_notification(): void
     {
         Notification::fake();
 
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
         $user = User::factory()->create([
             'email' => 'resend@csn.gov.ph',
         ]);
 
-        $response = $this->actingAs($admin)->postJson("/users/{$user->id}/invite");
+        $response = $this->actingAs($superadmin)->postJson("/users/{$user->id}/invite");
         $response->assertOk();
 
         Notification::assertSentTo($user, UserInvitationNotification::class);
     }
 
-    public function test_admin_cannot_delete_themselves(): void
+    public function test_superadmin_cannot_delete_themselves(): void
     {
-        $admin = $this->createAdmin();
+        $superadmin = $this->createSuperadmin();
 
-        $response = $this->actingAs($admin)->deleteJson("/users/{$admin->id}");
+        $response = $this->actingAs($superadmin)->deleteJson("/users/{$superadmin->id}");
         $response->assertStatus(400);
 
-        $this->assertDatabaseHas('users', ['id' => $admin->id]);
+        $this->assertDatabaseHas('users', ['id' => $superadmin->id]);
+    }
+
+    public function test_superadmin_can_create_user_with_descriptive_or_variant_role_name(): void
+    {
+        Notification::fake();
+
+        $superadmin = $this->createSuperadmin();
+
+        $payload = [
+            'name' => 'Aki Test',
+            'email' => 'aki.test@csn.gov.ph',
+            'role' => 'Client Admin (Web Command Center)',
+            'phone' => '12312312321',
+            'status' => 'active',
+            'send_invite' => true,
+        ];
+
+        $response = $this->actingAs($superadmin)->postJson('/users', $payload);
+
+        $response->assertStatus(201);
+        $response->assertJsonFragment(['name' => 'Aki Test', 'role' => 'admin']);
+
+        $user = User::where('email', 'aki.test@csn.gov.ph')->first();
+        $this->assertNotNull($user);
+        $this->assertTrue($user->hasRole('admin'));
     }
 }

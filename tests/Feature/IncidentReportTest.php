@@ -21,13 +21,13 @@ class IncidentReportTest extends TestCase
 
     protected function createStaffUser(): User
     {
-        $staff = User::factory()->create([
-            'role' => 'staff',
+        $admin = User::factory()->create([
+            'role' => 'admin',
             'is_active' => true,
         ]);
-        $staff->assignRole('staff');
+        $admin->assignRole('admin');
 
-        return $staff;
+        return $admin;
     }
 
     public function test_unauthenticated_user_cannot_access_incident_reporting_endpoints(): void

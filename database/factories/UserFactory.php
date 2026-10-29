@@ -38,6 +38,46 @@ class UserFactory extends Factory
     }
 
     /**
+     * Indicate that the user is an admin.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn () => [
+            'role' => 'admin',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a superadmin.
+     */
+    public function superadmin(): static
+    {
+        return $this->state(fn () => [
+            'role' => 'superadmin',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a responder.
+     */
+    public function responder(): static
+    {
+        return $this->state(fn () => [
+            'role' => 'responder',
+        ]);
+    }
+
+    /**
+     * Indicate that the user is a guardian.
+     */
+    public function guardian(): static
+    {
+        return $this->state(fn () => [
+            'role' => 'guardian',
+        ]);
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static

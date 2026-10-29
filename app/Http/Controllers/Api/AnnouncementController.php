@@ -2,7 +2,4 @@
 
 namespace App\Http\Controllers\Api;
 
-class AnnouncementController extends AnnouncementApiController
-{
-}
-
+class AnnouncementController extends AnnouncementApiController {}

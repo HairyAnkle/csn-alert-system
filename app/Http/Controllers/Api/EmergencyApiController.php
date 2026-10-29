@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\RaiseEmergency;
 use App\Events\EmergencyCancelled;
 use App\Events\EmergencyLocationUpdated;
-use App\Events\EmergencyRaised;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\EmergencyResource;
 use App\Models\Emergency;
+use App\Services\GeocodingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -39,13 +40,20 @@ class EmergencyApiController extends Controller
     public function store(Request $request): JsonResponse
     {
         $d = $request->validate([
-            'type' => ['required', Rule::in(['medical_crisis', 'seizure_sensory', 'wandering', 'fire'])],
-            'lat'  => 'nullable|numeric|between:-90,90',
-            'lng'  => 'nullable|numeric|between:-180,180',
+            'type' => ['required', Rule::in(['medical_crisis', 'seizure_sensory', 'wandering', 'fire', 'general'])],
+            'urgency' => ['nullable', Rule::in(['high', 'low'])],
+            'message' => 'nullable|string|max:1000',
+            'guardian_notes' => 'nullable|string|max:1000',
+            'lat' => 'nullable|numeric|between:-90,90',
+            'lng' => 'nullable|numeric|between:-180,180',
         ]);
 
+        if (! isset($d['guardian_notes']) && isset($d['message'])) {
+            $d['guardian_notes'] = $d['message'];
+        }
+
         $user = $request->user();
-        $result = app(\App\Actions\RaiseEmergency::class)->execute($d, $user);
+        $result = app(RaiseEmergency::class)->execute($d, $user);
 
         return response()->json([
             'emergency' => (new EmergencyResource($result['emergency']))->resolve(),
@@ -80,11 +88,19 @@ class EmergencyApiController extends Controller
             'lng' => 'required|numeric|between:-180,180',
         ]);
 
-        $emergency->update([
+        $updates = [
             'lat' => (float) $data['lat'],
             'lng' => (float) $data['lng'],
-            'location' => sprintf('Live GPS (%.5f, %.5f)', $data['lat'], $data['lng']),
-        ]);
+        ];
+
+        if (empty($emergency->location) || str_starts_with($emergency->location, 'Live GPS')) {
+            $resolved = app(GeocodingService::class)->reverseGeocode((float) $data['lat'], (float) $data['lng']);
+            if ($resolved) {
+                $updates['location'] = $resolved;
+            }
+        }
+
+        $emergency->update($updates);
 
         $emergency->load(['child', 'responder']);
 

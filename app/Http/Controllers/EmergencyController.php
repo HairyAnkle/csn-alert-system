@@ -2,13 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Events\EmergencyRaised;
+use App\Actions\RaiseEmergency;
 use App\Models\Emergency;
 use App\Models\User;
 use App\Services\SmsNotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 class EmergencyController extends Controller
 {
@@ -49,7 +51,7 @@ class EmergencyController extends Controller
             'eta' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $result = app(\App\Actions\RaiseEmergency::class)->execute($validated, $request->user());
+        $result = app(RaiseEmergency::class)->execute($validated, $request->user());
 
         return response()->json($result['emergency']->toFrontendArray(), 201);
     }
@@ -80,10 +82,48 @@ class EmergencyController extends Controller
 
         $validated = $request->validate([
             'responder_id' => ['nullable', 'exists:users,id'],
+            'barangay_unit' => ['nullable', 'string', 'max:255'],
+            'barangay_phone' => ['nullable', 'string', 'max:100'],
             'eta' => ['nullable', 'string', 'max:50'],
         ]);
 
-        $responderId = $validated['responder_id'] ?? $emergency->responder_id;
+        $responderId = $validated['responder_id'] ?? null;
+
+        if (! $responderId && ! empty($validated['barangay_unit'])) {
+            $barangayName = trim($validated['barangay_unit']);
+            $barangayUser = User::where('name', $barangayName)
+                ->where('role', 'responder')
+                ->first();
+
+            if (! $barangayUser) {
+                $slug = Str::slug($barangayName) ?: 'barangay-unit';
+                $email = $slug.'@barangay.paranaque.gov.ph';
+                if (User::where('email', $email)->exists()) {
+                    $email = $slug.'-'.Str::lower(Str::random(4)).'@barangay.paranaque.gov.ph';
+                }
+
+                $barangayUser = User::create([
+                    'name' => $barangayName,
+                    'email' => $email,
+                    'password' => Hash::make(Str::random(24)),
+                    'role' => 'responder',
+                    'unit' => 'Parañaque Barangay Emergency Response Unit',
+                    'phone' => $validated['barangay_phone'] ?? '(02) 8820-7377',
+                    'status' => 'active',
+                    'is_active' => true,
+                ]);
+
+                if (Role::where('name', 'responder')->where('guard_name', 'web')->exists()) {
+                    $barangayUser->assignRole('responder');
+                }
+            } elseif (! empty($validated['barangay_phone']) && $barangayUser->phone !== $validated['barangay_phone']) {
+                $barangayUser->update(['phone' => $validated['barangay_phone']]);
+            }
+
+            $responderId = $barangayUser->id;
+        }
+
+        $responderId = $responderId ?? $emergency->responder_id;
 
         if (! $responderId && $request->user()?->hasRole('responder')) {
             $responderId = $request->user()->id;
@@ -147,7 +187,7 @@ class EmergencyController extends Controller
             abort(401, 'Authentication required.');
         }
 
-        $allowedRoles = ['admin', 'staff', 'responder'];
+        $allowedRoles = ['superadmin', 'admin', 'responder'];
 
         $hasSpatieRole = $user->hasAnyRole($allowedRoles);
         $hasColumnRole = in_array(strtolower((string) $user->role), $allowedRoles, true);

@@ -1,0 +1,382 @@
+rules_version = '2';
+
+// ==============================================================================
+// Parañaque CSN Emergency Alert System (CSN Alert System)
+// Cloud Firestore Security Rules
+//
+// Governed by: Republic Act 10173 (Philippine Data Privacy Act)
+// Architecture:
+// - Server-side Laravel actions use Firebase Admin SDK (Service Account bypasses rules).
+// - Web Dispatcher Dashboard and Mobile Guardian/Responder clients use client SDKs
+//   strictly governed by these security rules.
+// ==============================================================================
+
+// ==============================================================================
+// Assumed Data Model
+// ==============================================================================
+//
+// Collection: emergencies/{emergencyId}
+// Document ID: Numeric ID (e.g. "123") or string UID (e.g. "em_670b89f2a")
+// Fields:
+//   - id: int or string (optional/immutable after creation) - Emergency ID
+//   - child_id / childId: int or string (optional) - Reference to ChildProfile
+//   - guardian_id / guardianId: string or int (optional) - Guardian UID / ID
+//   - responder_id / responderId: string or int (optional) - Responder UID / ID
+//   - type: string (required, 1-100 chars, e.g. 'medical_crisis', 'seizure_sensory', 'wandering', 'fire')
+//   - rawType: string (optional, max 100 chars)
+//   - urgency: string (required, 'high'|'low'|'critical'|'medium')
+//   - status: string (required, 'pending'|'responding'|'resolved'|'cancelled')
+//   - location: string (optional, max 255 chars) - Human-readable or reverse-geocoded location
+//   - coords: string (optional, max 100 chars) - Formatted coordinate string
+//   - lat: number (optional, range: -90.0 to 90.0) - Latitude coordinate
+//   - lng: number (optional, range: -180.0 to 180.0) - Longitude coordinate
+//   - guardian_notes / guardianNotes: string (optional, max 1000 chars)
+//   - reported_at / reportedAt / reported_at_iso: timestamp or string (immutable creation timestamp)
+//   - created_at / createdAt / created_at_iso: timestamp or string (immutable creation timestamp)
+//   - updated_at / updatedAt / updated_at_iso: timestamp or string (last update timestamp)
+//   - acknowledged_at / acknowledgedAt: timestamp or string (dispatch acknowledgement timestamp)
+//   - dispatched_at / dispatchedAt: timestamp or string (responder dispatch timestamp)
+//   - resolved_at / resolvedAt: timestamp or string (resolution timestamp)
+//   - cancelled_at / cancelledAt: timestamp or string (cancellation timestamp)
+//   - incident_summary: string (optional, max 5000 chars) - Post-incident resolution summary
+//   - eta: string (optional, max 50 chars) - Estimated responder arrival time
+//   - child: map (optional, max 10 keys: id, name, age, condition, avatarInitials, emergencyContact)
+//   - responder: map (optional, max 10 keys: id, name, unit, role, phone, eta)
+//
+// Collection: announcements/{announcementId}
+// Document ID: Auto-generated string ID or numeric ID
+// Fields:
+//   - id: int or string (optional/immutable after creation)
+//   - title: string (required, 1-255 chars) - Announcement title
+//   - body: string (required, 1-5000 chars) - Announcement description / alert text
+//   - created_by / createdBy / author: string or int (optional, max 100 chars) - Creator ID / name
+//   - published_at / publishedAt: timestamp or string (optional, max 50 chars)
+//   - created_at / createdAt: timestamp or string (optional, immutable)
+//   - updated_at / updatedAt: timestamp or string (optional)
+//
+// ==============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==========================================================================
+    // Helper Functions: Authentication & Role Verification
+    // ==========================================================================
+
+    // Verifies whether the request originates from an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifies if the authenticated user has an Administrator role
+    function isAdmin() {
+      return isAuthenticated() && (
+        ('role' in request.auth.token && request.auth.token.role == 'admin') ||
+        ('admin' in request.auth.token && request.auth.token.admin == true)
+      );
+    }
+
+    // Verifies if the authenticated user has Administrator, Staff, or Dispatcher role
+    function isAdminOrStaff() {
+      return isAuthenticated() && (
+        isAdmin() ||
+        ('role' in request.auth.token && request.auth.token.role in ['staff', 'dispatcher']) ||
+        ('staff' in request.auth.token && request.auth.token.staff == true) ||
+        ('dispatcher' in request.auth.token && request.auth.token.dispatcher == true)
+      );
+    }
+
+    // Verifies if the authenticated user has an Emergency Responder role
+    function isResponder() {
+      return isAuthenticated() && (
+        ('role' in request.auth.token && request.auth.token.role == 'responder') ||
+        ('responder' in request.auth.token && request.auth.token.responder == true)
+      );
+    }
+
+    // Safely compares an ID (string or integer) with a Firebase Auth UID
+    function isIdMatch(fieldVal, uid) {
+      return fieldVal != null && (
+        (fieldVal is string && fieldVal == uid) ||
+        (fieldVal is int && string(fieldVal) == uid)
+      );
+    }
+
+    // Verifies if the authenticated user is the guardian recorded on the emergency document
+    function isDocGuardian(data) {
+      return isAuthenticated() && (
+        ('guardian_id' in data && isIdMatch(data.guardian_id, request.auth.uid)) ||
+        ('guardianId' in data && isIdMatch(data.guardianId, request.auth.uid))
+      );
+    }
+
+    // Verifies if the authenticated user is the assigned responder on the emergency document
+    function isDocResponder(data) {
+      return isAuthenticated() && (
+        ('responder_id' in data && isIdMatch(data.responder_id, request.auth.uid)) ||
+        ('responderId' in data && isIdMatch(data.responderId, request.auth.uid))
+      );
+    }
+
+    // ==========================================================================
+    // Helper Functions: Type, Length & Resource Exhaustion Defense
+    // ==========================================================================
+
+    // Validates optional ID fields (int or string bounded up to 128 chars)
+    function isValidOptionalId(data, field) {
+      return !(field in data) ||
+             data[field] == null ||
+             data[field] is int ||
+             (data[field] is string && data[field].size() <= 128);
+    }
+
+    // Validates optional string with upper boundary to prevent DoS/memory attacks
+    function isValidOptionalString(data, field, maxLen) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    // Validates geographic coordinates within valid GPS bounds
+    function isValidOptionalCoordinate(data, field, minVal, maxVal) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is number && data[field] >= minVal && data[field] <= maxVal);
+    }
+
+    // Validates timestamp or ISO date string
+    function isValidOptionalTimestampOrString(data, field) {
+      return !(field in data) ||
+             data[field] == null ||
+             data[field] is timestamp ||
+             (data[field] is string && data[field].size() <= 60);
+    }
+
+    // Validates optional map object with key size limit
+    function isValidOptionalMap(data, field, maxKeys) {
+      return !(field in data) ||
+             data[field] == null ||
+             (data[field] is map && data[field].keys().size() <= maxKeys);
+    }
+
+    // Verifies that tamper-evident emergency audit fields remain untouched on update
+    function areImmutableAuditFieldsUnchanged() {
+      return (!('id' in resource.data) || ('id' in request.resource.data && request.resource.data.id == resource.data.id)) &&
+             (!('created_at_iso' in resource.data) || ('created_at_iso' in request.resource.data && request.resource.data.created_at_iso == resource.data.created_at_iso)) &&
+             (!('reported_at_iso' in resource.data) || ('reported_at_iso' in request.resource.data && request.resource.data.reported_at_iso == resource.data.reported_at_iso)) &&
+             (!('reported_at' in resource.data) || ('reported_at' in request.resource.data && request.resource.data.reported_at == resource.data.reported_at)) &&
+             (!('createdAt' in resource.data) || ('createdAt' in request.resource.data && request.resource.data.createdAt == resource.data.createdAt));
+    }
+
+    // ==========================================================================
+    // Domain Validator: Emergency Document
+    // ==========================================================================
+
+    function emergencyAllowedFields() {
+      return [
+        'id', 'child_id', 'childId', 'child',
+        'guardian_id', 'guardianId',
+        'responder_id', 'responderId', 'responder',
+        'type', 'rawType', 'urgency', 'status',
+        'location', 'coords', 'lat', 'lng',
+        'guardian_notes', 'guardianNotes',
+        'reported_at', 'reportedAt', 'reported_at_iso',
+        'created_at', 'createdAt', 'created_at_iso',
+        'updated_at', 'updatedAt', 'updated_at_iso',
+        'acknowledged_at', 'acknowledgedAt',
+        'dispatched_at', 'dispatchedAt',
+        'resolved_at', 'resolvedAt',
+        'cancelled_at', 'cancelledAt',
+        'incident_summary', 'eta'
+      ];
+    }
+
+    function hasRequiredEmergencyFields(data) {
+      return ('type' in data) &&
+             ('urgency' in data) &&
+             ('status' in data);
+    }
+
+    // Mandatory Validator Function Pattern: Called in BOTH create and update
+    function isValidEmergency(data) {
+      return data.keys().hasOnly(emergencyAllowedFields()) &&
+             hasRequiredEmergencyFields(data) &&
+             data.type is string && data.type.size() > 0 && data.type.size() <= 100 &&
+             data.urgency is string && data.urgency in ['high', 'low', 'critical', 'medium'] &&
+             data.status is string && data.status in ['pending', 'responding', 'resolved', 'cancelled'] &&
+             isValidOptionalId(data, 'id') &&
+             isValidOptionalId(data, 'child_id') &&
+             isValidOptionalId(data, 'childId') &&
+             isValidOptionalId(data, 'guardian_id') &&
+             isValidOptionalId(data, 'guardianId') &&
+             isValidOptionalId(data, 'responder_id') &&
+             isValidOptionalId(data, 'responderId') &&
+             isValidOptionalString(data, 'location', 255) &&
+             isValidOptionalString(data, 'coords', 100) &&
+             isValidOptionalString(data, 'rawType', 100) &&
+             isValidOptionalString(data, 'guardian_notes', 1000) &&
+             isValidOptionalString(data, 'guardianNotes', 1000) &&
+             isValidOptionalString(data, 'incident_summary', 5000) &&
+             isValidOptionalString(data, 'eta', 50) &&
+             isValidOptionalString(data, 'reportedAt', 100) &&
+             isValidOptionalString(data, 'reported_at_iso', 50) &&
+             isValidOptionalString(data, 'created_at_iso', 50) &&
+             isValidOptionalString(data, 'updated_at_iso', 50) &&
+             isValidOptionalString(data, 'acknowledgedAt', 100) &&
+             isValidOptionalString(data, 'dispatchedAt', 100) &&
+             isValidOptionalString(data, 'resolvedAt', 100) &&
+             isValidOptionalString(data, 'cancelledAt', 100) &&
+             isValidOptionalTimestampOrString(data, 'reported_at') &&
+             isValidOptionalTimestampOrString(data, 'created_at') &&
+             isValidOptionalTimestampOrString(data, 'createdAt') &&
+             isValidOptionalTimestampOrString(data, 'updated_at') &&
+             isValidOptionalTimestampOrString(data, 'updatedAt') &&
+             isValidOptionalTimestampOrString(data, 'acknowledged_at') &&
+             isValidOptionalTimestampOrString(data, 'dispatched_at') &&
+             isValidOptionalTimestampOrString(data, 'resolved_at') &&
+             isValidOptionalTimestampOrString(data, 'cancelled_at') &&
+             isValidOptionalCoordinate(data, 'lat', -90.0, 90.0) &&
+             isValidOptionalCoordinate(data, 'lng', -180.0, 180.0) &&
+             isValidOptionalMap(data, 'child', 10) &&
+             isValidOptionalMap(data, 'responder', 10);
+    }
+
+    // ==========================================================================
+    // Domain Validator: Announcement Document
+    // ==========================================================================
+
+    function announcementAllowedFields() {
+      return [
+        'id', 'title', 'body',
+        'created_by', 'createdBy', 'author',
+        'published_at', 'publishedAt',
+        'created_at', 'createdAt',
+        'updated_at', 'updatedAt'
+      ];
+    }
+
+    function areAnnouncementAuditFieldsUnchanged() {
+      return (!('id' in resource.data) || ('id' in request.resource.data && request.resource.data.id == resource.data.id)) &&
+             (!('created_at' in resource.data) || ('created_at' in request.resource.data && request.resource.data.created_at == resource.data.created_at)) &&
+             (!('createdAt' in resource.data) || ('createdAt' in request.resource.data && request.resource.data.createdAt == resource.data.createdAt)) &&
+             (!('created_by' in resource.data) || ('created_by' in request.resource.data && request.resource.data.created_by == resource.data.created_by)) &&
+             (!('createdBy' in resource.data) || ('createdBy' in request.resource.data && request.resource.data.createdBy == resource.data.createdBy));
+    }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasOnly(announcementAllowedFields()) &&
+             ('title' in data) &&
+             ('body' in data) &&
+             data.title is string && data.title.size() >= 1 && data.title.size() <= 255 &&
+             data.body is string && data.body.size() >= 1 && data.body.size() <= 5000 &&
+             isValidOptionalId(data, 'id') &&
+             isValidOptionalId(data, 'created_by') &&
+             isValidOptionalId(data, 'createdBy') &&
+             isValidOptionalString(data, 'author', 100) &&
+             isValidOptionalTimestampOrString(data, 'published_at') &&
+             isValidOptionalTimestampOrString(data, 'publishedAt') &&
+             isValidOptionalTimestampOrString(data, 'created_at') &&
+             isValidOptionalTimestampOrString(data, 'createdAt') &&
+             isValidOptionalTimestampOrString(data, 'updated_at') &&
+             isValidOptionalTimestampOrString(data, 'updatedAt');
+    }
+
+    // ==========================================================================
+    // Collection Rules: emergencies/{emergencyId}
+    // ==========================================================================
+
+    match /emergencies/{emergencyId} {
+
+      // Read Access:
+      // - Dispatchers / Staff / Admins can read all emergencies.
+      // - Guardians can read emergencies they created / own.
+      // - Assigned Responders can read emergencies assigned to them.
+      // - Active emergencies ('pending', 'responding') can be read by authenticated
+      //   users for the real-time Dispatcher dashboard feed.
+      // - Resolved/cancelled emergencies (which contain sensitive medical/child PII)
+      //   are protected under RA 10173 and readable ONLY by Staff/Admin, the Guardian, or Responder.
+      allow read: if isAuthenticated() && (
+        isAdminOrStaff() ||
+        isDocGuardian(resource.data) ||
+        isDocResponder(resource.data) ||
+        resource.data.status in ['pending', 'responding']
+      );
+
+      // Create Access:
+      // - Staff/Admin can create alerts on behalf of emergency phone calls.
+      // - Authenticated Guardians can create alerts with their own UID and status 'pending'.
+      // - Both must pass strict payload validation.
+      allow create: if isAuthenticated() &&
+                    isValidEmergency(request.resource.data) && (
+                      isAdminOrStaff() ||
+                      (isDocGuardian(request.resource.data) && request.resource.data.status == 'pending')
+                    );
+
+      // Update Access:
+      // 1. Staff / Admin: Full update capability (preserving tamper-evident audit timestamps).
+      // 2. Assigned Responder: Can update live GPS location, location text, ETA, and transition status to 'responding'.
+      // 3. Guardian Owner: Can cancel an active alert or update live GPS / notes while active.
+      // All paths strictly invoke isValidEmergency() and protect audit timestamps.
+      allow update: if isAuthenticated() &&
+                    isValidEmergency(request.resource.data) &&
+                    areImmutableAuditFieldsUnchanged() && (
+                      // Case 1: Staff / Dispatcher / Admin update
+                      isAdminOrStaff() ||
+
+                      // Case 2: Assigned Responder updating live coordinates and responding status
+                      (
+                        resource.data.status in ['pending', 'responding'] &&
+                        (isDocResponder(resource.data) || (isResponder() && ('responder_id' in request.resource.data && isIdMatch(request.resource.data.responder_id, request.auth.uid)))) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                          'lat', 'lng', 'location', 'coords', 'status', 'eta',
+                          'responder_id', 'responderId', 'responder',
+                          'updated_at', 'updated_at_iso', 'updatedAt',
+                          'dispatched_at', 'dispatchedAt'
+                        ]) &&
+                        request.resource.data.status in ['pending', 'responding']
+                      ) ||
+
+                      // Case 3: Guardian owner updating GPS coordinates, notes, or cancelling false alarm
+                      (
+                        resource.data.status in ['pending', 'responding'] &&
+                        isDocGuardian(resource.data) &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                          'lat', 'lng', 'location', 'coords',
+                          'guardian_notes', 'guardianNotes', 'status',
+                          'cancelled_at', 'cancelledAt',
+                          'updated_at', 'updated_at_iso', 'updatedAt'
+                        ]) &&
+                        request.resource.data.status in ['pending', 'responding', 'cancelled']
+                      )
+                    );
+
+      // Delete Access:
+      // Only Administrators can delete emergency records.
+      // Prevents premature deletion and ensures audit trail compliance under RA 10173.
+      allow delete: if isAdmin();
+    }
+
+    // ==========================================================================
+    // Collection Rules: announcements/{announcementId}
+    // ==========================================================================
+
+    match /announcements/{announcementId} {
+      // Read Access: All authenticated users can read public announcements & safety advisories
+      allow read: if isAuthenticated();
+
+      // Write Access: Staff and Admins only, with data validation and immutable audit keys
+      allow create: if isAdminOrStaff() && isValidAnnouncement(request.resource.data);
+      allow update: if isAdminOrStaff() && isValidAnnouncement(request.resource.data) && areAnnouncementAuditFieldsUnchanged();
+      allow delete: if isAdminOrStaff();
+    }
+
+    // ==========================================================================
+    // Default Deny Fallback
+    // ==========================================================================
+    // All unmatched collections or paths are blocked from unauthenticated or unauthorized reads/writes
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

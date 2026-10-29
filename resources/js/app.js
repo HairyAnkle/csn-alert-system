@@ -11,3 +11,4 @@ Alpine.start();
  */
 
 import './echo';
+import './firebase';

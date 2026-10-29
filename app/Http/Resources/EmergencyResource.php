@@ -17,7 +17,10 @@ class EmergencyResource extends JsonResource
         return [
             'id' => $this->id,
             'type' => $this->type,
+            'urgency' => $this->urgency ?? 'high',
             'status' => $this->status, // pending | responding | resolved | cancelled
+            'message' => $this->guardian_notes ?? '',
+            'guardian_notes' => $this->guardian_notes ?? '',
             'lat' => $this->lat !== null ? (float) $this->lat : null,
             'lng' => $this->lng !== null ? (float) $this->lng : null,
             'location' => $this->location,

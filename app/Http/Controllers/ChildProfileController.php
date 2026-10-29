@@ -196,7 +196,7 @@ class ChildProfileController extends Controller
             abort(401, 'Authentication required.');
         }
 
-        $allowed = ['admin', 'staff', 'guardian'];
+        $allowed = ['superadmin', 'admin', 'guardian'];
         if (! $user->hasAnyRole($allowed) && ! in_array(strtolower((string) $user->role), $allowed, true)) {
             abort(403, 'Unauthorized to create child profiles.');
         }
@@ -208,8 +208,8 @@ class ChildProfileController extends Controller
             abort(401, 'Authentication required.');
         }
 
-        // Admin, staff, and responders can view during dispatch/triage
-        if ($user->hasAnyRole(['admin', 'staff', 'responder']) || in_array(strtolower((string) $user->role), ['admin', 'staff', 'responder'], true)) {
+        // Superadmin, admin, and responders can view during dispatch/triage
+        if ($user->hasAnyRole(['superadmin', 'admin', 'responder']) || in_array(strtolower((string) $user->role), ['superadmin', 'admin', 'responder'], true)) {
             return;
         }
 
@@ -227,7 +227,7 @@ class ChildProfileController extends Controller
             abort(401, 'Authentication required.');
         }
 
-        if ($user->hasAnyRole(['admin', 'staff']) || in_array(strtolower((string) $user->role), ['admin', 'staff'], true)) {
+        if ($user->hasAnyRole(['superadmin', 'admin']) || in_array(strtolower((string) $user->role), ['superadmin', 'admin'], true)) {
             return;
         }
 
@@ -244,8 +244,8 @@ class ChildProfileController extends Controller
             abort(401, 'Authentication required.');
         }
 
-        if (! $user->hasAnyRole(['admin', 'staff']) && ! in_array(strtolower((string) $user->role), ['admin', 'staff'], true)) {
-            abort(403, 'Unauthorized. Only administrators and staff can delete child profiles.');
+        if (! $user->hasAnyRole(['superadmin', 'admin']) && ! in_array(strtolower((string) $user->role), ['superadmin', 'admin'], true)) {
+            abort(403, 'Unauthorized. Only administrators can delete child profiles.');
         }
     }
 
@@ -255,8 +255,8 @@ class ChildProfileController extends Controller
             return false;
         }
 
-        $isStaffOrAdmin = $user->hasAnyRole(['admin', 'staff', 'responder']) || in_array(strtolower((string) $user->role), ['admin', 'staff', 'responder'], true);
+        $isAdminOrResponder = $user->hasAnyRole(['superadmin', 'admin', 'responder']) || in_array(strtolower((string) $user->role), ['superadmin', 'admin', 'responder'], true);
 
-        return ! $isStaffOrAdmin;
+        return ! $isAdminOrResponder;
     }
 }

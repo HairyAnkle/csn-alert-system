@@ -6,6 +6,7 @@ use App\Events\EmergencyRaised;
 use App\Models\Emergency;
 use App\Models\User;
 use App\Services\FcmNotificationService;
+use App\Services\GeocodingService;
 use Illuminate\Support\Facades\Log;
 
 class RaiseEmergency
@@ -38,12 +39,25 @@ class RaiseEmergency
             }
         }
 
-        // Format location string if coordinates are provided
+        // Format location string if coordinates are provided, and geocode if needed
+        $lat = isset($data['lat']) ? (float) $data['lat'] : null;
+        $lng = isset($data['lng']) ? (float) $data['lng'] : null;
+
         $location = $data['location'] ?? null;
-        if (empty($location)) {
-            $location = (isset($data['lat']) && isset($data['lng']))
-                ? sprintf('Live GPS (%.5f, %.5f)', (float) $data['lat'], (float) $data['lng'])
-                : 'Live GPS';
+        if (empty($location) || str_starts_with($location, 'Live GPS')) {
+            if ($lat !== null && $lng !== null) {
+                $resolvedName = app(GeocodingService::class)->reverseGeocode($lat, $lng);
+                $location = $resolvedName ?: sprintf('Live GPS (%.5f, %.5f)', $lat, $lng);
+            } else {
+                $location = 'Live GPS';
+            }
+        } elseif ($lat === null || $lng === null) {
+            // If location text was provided without coordinates, attempt to geocode to Parañaque landmarks
+            $coords = app(GeocodingService::class)->geocode($location);
+            if ($coords) {
+                $lat = $coords['lat'];
+                $lng = $coords['lng'];
+            }
         }
 
         // Determine child_id: from input or from actor's linked child profile
@@ -56,8 +70,8 @@ class RaiseEmergency
             'urgency' => $data['urgency'] ?? 'high',
             'status' => 'pending',
             'location' => $location,
-            'lat' => isset($data['lat']) ? (float) $data['lat'] : null,
-            'lng' => isset($data['lng']) ? (float) $data['lng'] : null,
+            'lat' => $lat,
+            'lng' => $lng,
             'guardian_notes' => $data['guardian_notes'] ?? null,
             'responder_id' => $data['responder_id'] ?? null,
             'eta' => $data['eta'] ?? null,

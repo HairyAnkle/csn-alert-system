@@ -26,7 +26,7 @@ class FoundationSetupTest extends TestCase
 
     public function test_roles_can_be_assigned_and_checked(): void
     {
-        $roles = ['admin', 'guardian', 'staff', 'responder'];
+        $roles = ['superadmin', 'admin', 'guardian', 'responder'];
         foreach ($roles as $roleName) {
             Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
         }

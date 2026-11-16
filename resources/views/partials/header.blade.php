@@ -94,12 +94,12 @@
 
                 {{-- Notifications Content List --}}
                 <div class="max-h-80 overflow-y-auto divide-y divide-slate-100">
-                    {{-- Active Emergencies (Pending & Responding) --}}
-                    <template x-for="e in emergencies.filter(item => item.status !== 'resolved')" :key="'notif-' + e.id">
+                    {{-- Active Emergencies (Pending, Responding, Arrived) sorted newest first --}}
+                    <template x-for="e in activeNotificationsList" :key="'notif-' + e.id">
                         <div @click="currentTab = 'emergency'; notificationsOpen = false"
                              class="flex items-start gap-3 p-3.5 hover:bg-slate-50/90 cursor-pointer transition">
                             <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
-                                  :class="e.urgency === 'high' ? 'bg-critical-100 text-critical-600' : 'bg-amber-100 text-amber-600'">
+                                  :class="e.status === 'arrived' ? 'bg-emerald-100 text-emerald-700' : (e.urgency === 'high' ? 'bg-critical-100 text-critical-600' : 'bg-amber-100 text-amber-600')">
                                 <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                                     <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                                 </svg>
@@ -110,11 +110,17 @@
                                     <span class="text-[10px] text-slate-400 font-mono shrink-0" x-text="e.reportedAt"></span>
                                 </div>
                                 <p class="text-xs text-slate-600 truncate mt-0.5">
-                                    <span class="font-medium text-slate-800" x-text="e.type"></span> &bull; <span x-text="e.location"></span>
+                                    <span class="font-medium text-slate-800" x-text="e.type"></span> &bull; <span x-text="e.facilityRoom ? ('CSN Center — ' + e.facilityRoom) : e.location"></span>
                                 </p>
-                                <span class="inline-block mt-1 text-[10px] font-semibold uppercase tracking-wider rounded px-1.5 py-0.5"
-                                      :class="e.status === 'pending' ? 'bg-critical-50 text-critical-700 border border-critical-200' : 'bg-amber-50 text-amber-700 border border-amber-200'"
-                                      x-text="e.status"></span>
+                                <div class="mt-1 flex flex-wrap items-center gap-1.5">
+                                    <span class="inline-block text-[10px] font-semibold uppercase tracking-wider rounded px-1.5 py-0.5"
+                                          :class="e.status === 'arrived' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : (e.status === 'pending' ? 'bg-critical-50 text-critical-700 border border-critical-200' : 'bg-amber-50 text-amber-700 border border-amber-200')"
+                                          x-text="e.status === 'arrived' ? 'Responder Arrived ✓' : e.status"></span>
+                                    <span x-show="e.reportedByRole === 'teacher'"
+                                          class="inline-block text-[10px] font-semibold rounded bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5">
+                                        Teacher Alert
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </template>
@@ -136,7 +142,7 @@
                     </template>
 
                     {{-- Empty State when no active emergencies --}}
-                    <div x-show="emergencies.filter(e => e.status !== 'resolved').length === 0 && activityLog.length === 0" 
+                    <div x-show="activeNotificationsList.length === 0 && activityLog.length === 0" 
                          class="p-6 text-center text-slate-500">
                         <div class="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 border border-emerald-200 text-emerald-600 mb-2">
                             <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

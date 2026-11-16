@@ -464,10 +464,19 @@
                             if (Array.isArray(latest)) {
                                 const currentIds = new Set(this.emergencies.map(e => e.id));
                                 const newArrivals = latest.filter(e => !currentIds.has(e.id));
-                                
+                                const newlyArrivedResponders = latest.filter(e => {
+                                    const prev = this.emergencies.find(old => old.id === e.id);
+                                    if (!prev) return false;
+                                    const wasArrived = prev.status === 'arrived' || Boolean(prev.responderArrivedAt);
+                                    const isNowArrived = e.status === 'arrived' || Boolean(e.responderArrivedAt);
+                                    return !wasArrived && isNowArrived;
+                                });
+
                                 if (newArrivals.length > 0) {
                                     const topUrgency = newArrivals.some(e => e.urgency === 'high') ? 'high' : 'low';
                                     this.playAlertSound(topUrgency);
+                                } else if (newlyArrivedResponders.length > 0) {
+                                    this.playAlertSound('low');
                                 }
 
                                 this.emergencies = latest;
@@ -1070,7 +1079,7 @@
                     return this.emergencies.filter(e => e.status !== 'resolved' && e.status !== 'cancelled').length;
                 },
                 get respondingCount() {
-                    return this.emergencies.filter(e => e.status === 'responding').length;
+                    return this.emergencies.filter(e => e.status === 'responding' || e.status === 'arrived').length;
                 },
                 get resolvedToday() {
                     const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila' }).format(new Date());
@@ -1559,11 +1568,25 @@
 
                 // ---- filtered views ----
                 get filteredEmergencies() {
-                    if (this.emergencyFilter === 'all') return this.emergencies;
+                    const activeOnly = this.emergencies
+                        .filter(e => e.status !== 'resolved' && e.status !== 'cancelled')
+                        .slice()
+                        .sort((a, b) => (Number(b.reportedAtTimestamp || 0) - Number(a.reportedAtTimestamp || 0)) || (Number(b.id || 0) - Number(a.id || 0)));
+
+                    if (this.emergencyFilter === 'all') return activeOnly;
                     if (this.emergencyFilter === 'high' || this.emergencyFilter === 'low') {
-                        return this.emergencies.filter(e => e.urgency === this.emergencyFilter);
+                        return activeOnly.filter(e => e.urgency === this.emergencyFilter);
                     }
-                    return this.emergencies.filter(e => e.status === this.emergencyFilter);
+                    if (this.emergencyFilter === 'arrived') {
+                        return activeOnly.filter(e => e.status === 'arrived' || Boolean(e.responderArrivedAt));
+                    }
+                    return activeOnly.filter(e => e.status === this.emergencyFilter);
+                },
+                get activeNotificationsList() {
+                    return this.emergencies
+                        .filter(item => item.status !== 'resolved' && item.status !== 'cancelled')
+                        .slice()
+                        .sort((a, b) => (Number(b.reportedAtTimestamp || 0) - Number(a.reportedAtTimestamp || 0)) || (Number(b.id || 0) - Number(a.id || 0)));
                 },
 
                 get filteredChildren() {

@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Route;
 // Public signed invitation acceptance routes
 Route::get('/invitation/{user}', [InvitationController::class, 'show'])->name('invitation.accept');
 Route::post('/invitation/{user}', [InvitationController::class, 'store'])->name('invitation.store');
+Route::get('/invitation-activated', [InvitationController::class, 'activated'])->name('invitation.activated');
 
 Route::middleware(['auth', 'prevent_back_history'])->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -24,6 +25,7 @@ Route::middleware(['auth', 'prevent_back_history'])->group(function () {
     Route::post('/emergencies', [EmergencyController::class, 'store'])->name('emergencies.store');
     Route::patch('/emergencies/{emergency}/acknowledge', [EmergencyController::class, 'acknowledge'])->name('emergencies.acknowledge');
     Route::patch('/emergencies/{emergency}/dispatch', [EmergencyController::class, 'dispatch'])->name('emergencies.dispatch');
+    Route::patch('/emergencies/{emergency}/arrived', [EmergencyController::class, 'arrived'])->name('emergencies.arrived');
     Route::patch('/emergencies/{emergency}/resolve', [EmergencyController::class, 'resolve'])->name('emergencies.resolve');
 
     Route::resource('children', ChildProfileController::class)->except(['create', 'edit']);

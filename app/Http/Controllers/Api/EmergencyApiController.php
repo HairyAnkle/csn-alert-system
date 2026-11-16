@@ -17,17 +17,38 @@ use Illuminate\Validation\Rule;
 class EmergencyApiController extends Controller
 {
     /**
-     * List emergencies for the authenticated guardian.
+     * List emergencies for the authenticated guardian or CSN teacher.
      */
     public function index(Request $request): JsonResponse
     {
         $user = $request->user();
+        $isTeacher = $user->hasRole('teacher') || strtolower((string) $user->role) === 'teacher';
 
-        $emergencies = Emergency::where('guardian_id', $user->id)
-            ->with('responder')
-            ->latest('reported_at')
-            ->limit(50)
-            ->get();
+        if ($isTeacher) {
+            $emergencies = Emergency::where(function ($q) use ($user) {
+                $q->where('reported_by_id', $user->id)
+                    ->orWhere('reported_by_role', 'teacher');
+            })
+                ->with(['child.guardian', 'responder', 'reporter'])
+                ->latest('reported_at')
+                ->latest('id')
+                ->limit(50)
+                ->get();
+        } else {
+            $childIds = $user->children()->pluck('id');
+
+            $emergencies = Emergency::where(function ($q) use ($user, $childIds) {
+                $q->where('guardian_id', $user->id);
+                if ($childIds->isNotEmpty()) {
+                    $q->orWhereIn('child_id', $childIds);
+                }
+            })
+                ->with(['child.guardian', 'responder', 'reporter'])
+                ->latest('reported_at')
+                ->latest('id')
+                ->limit(50)
+                ->get();
+        }
 
         return response()->json([
             'emergencies' => EmergencyResource::collection($emergencies)->resolve(),
@@ -39,7 +60,13 @@ class EmergencyApiController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $isTeacher = $user && ($user->hasRole('teacher') || strtolower((string) $user->role) === 'teacher');
+
         $d = $request->validate([
+            'child_id' => [$isTeacher ? 'required' : 'nullable', 'exists:child_profiles,id'],
+            'facility_room' => ['nullable', 'string', 'max:150'],
+            'location' => ['nullable', 'string', 'max:255'],
             'type' => ['required', Rule::in(['medical_crisis', 'seizure_sensory', 'wandering', 'fire', 'general'])],
             'urgency' => ['nullable', Rule::in(['high', 'low'])],
             'message' => 'nullable|string|max:1000',
@@ -52,7 +79,6 @@ class EmergencyApiController extends Controller
             $d['guardian_notes'] = $d['message'];
         }
 
-        $user = $request->user();
         $result = app(RaiseEmergency::class)->execute($d, $user);
 
         return response()->json([
@@ -67,7 +93,7 @@ class EmergencyApiController extends Controller
     {
         $this->authorize('view', $emergency);
 
-        $emergency->load(['child', 'responder']);
+        $emergency->load(['child.guardian', 'responder', 'reporter']);
 
         return response()->json([
             'emergency' => (new EmergencyResource($emergency))->resolve(),
@@ -102,13 +128,35 @@ class EmergencyApiController extends Controller
 
         $emergency->update($updates);
 
-        $emergency->load(['child', 'responder']);
+        $emergency->load(['child.guardian', 'responder', 'reporter']);
 
         try {
             EmergencyLocationUpdated::dispatch($emergency);
         } catch (\Throwable $e) {
             Log::warning('Reverb location broadcasting failed: '.$e->getMessage());
         }
+
+        return response()->json([
+            'emergency' => (new EmergencyResource($emergency))->resolve(),
+        ]);
+    }
+
+    /**
+     * Confirm that the responder has arrived on scene (mobile user -> notifies admin & other mobile user).
+     */
+    public function arrived(Request $request, Emergency $emergency): JsonResponse
+    {
+        $this->authorize('arrive', $emergency);
+
+        abort_unless($emergency->isActive(), 409, 'This alert is already resolved or cancelled.');
+
+        $emergency->update([
+            'status' => 'arrived',
+            'responder_arrived_at' => $emergency->responder_arrived_at ?? now(),
+            'eta' => 'Arrived on Scene',
+        ]);
+
+        $emergency->load(['child.guardian', 'responder', 'reporter']);
 
         return response()->json([
             'emergency' => (new EmergencyResource($emergency))->resolve(),
@@ -129,7 +177,7 @@ class EmergencyApiController extends Controller
             'cancelled_at' => now(),
         ]);
 
-        $emergency->load(['child', 'responder']);
+        $emergency->load(['child.guardian', 'responder', 'reporter']);
 
         try {
             EmergencyCancelled::dispatch($emergency);

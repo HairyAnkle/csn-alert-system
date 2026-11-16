@@ -19,7 +19,9 @@ class EmergencyController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = Emergency::with(['child', 'responder'])->latest('reported_at');
+        $query = Emergency::with(['child', 'responder', 'reporter'])
+            ->latest('reported_at')
+            ->latest('id');
 
         if ($request->filled('status')) {
             $query->where('status', $request->query('status'));
@@ -143,10 +145,28 @@ class EmergencyController extends Controller
 
         $emergency->update($updates);
 
-        $emergency->load(['child', 'responder']);
+        $emergency->load(['child', 'responder', 'reporter']);
 
         // Send SMS notification to dispatched responder unit
         $smsService->notifyDispatchedUnit($emergency);
+
+        return response()->json($emergency->toFrontendArray());
+    }
+
+    /**
+     * Mark responder as arrived on scene.
+     */
+    public function arrived(Request $request, Emergency $emergency): JsonResponse
+    {
+        $this->authorizeManagement($request->user());
+
+        $emergency->update([
+            'status' => 'arrived',
+            'responder_arrived_at' => $emergency->responder_arrived_at ?? now(),
+            'eta' => 'Arrived on Scene',
+        ]);
+
+        $emergency->load(['child', 'responder', 'reporter']);
 
         return response()->json($emergency->toFrontendArray());
     }
@@ -173,7 +193,7 @@ class EmergencyController extends Controller
 
         $emergency->update($updates);
 
-        $emergency->load(['child', 'responder']);
+        $emergency->load(['child', 'responder', 'reporter']);
 
         return response()->json($emergency->toFrontendArray());
     }

@@ -27,7 +27,7 @@ class InvitationController extends Controller
     }
 
     /**
-     * Store the user's password, activate their account, and sign them in.
+     * Store the user's password, activate their account, and sign them in (or show mobile app notice).
      */
     public function store(Request $request, User $user): RedirectResponse
     {
@@ -46,8 +46,33 @@ class InvitationController extends Controller
             'status' => 'active',
         ])->save();
 
+        $role = strtolower((string) ($user->roles->first()?->name ?? $user->role ?? 'guardian'));
+        if (in_array($role, ['teacher', 'guardian'], true)) {
+            if (Auth::guard('web')->check()) {
+                Auth::guard('web')->logout();
+                $request->session()->invalidate();
+                $request->session()->regenerateToken();
+            }
+
+            return redirect()->route('invitation.activated', [
+                'email' => $user->email,
+                'role' => $role,
+            ]);
+        }
+
         Auth::login($user);
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * Show confirmation page instructing mobile app users (Teacher/Guardian) to sign in via the mobile app.
+     */
+    public function activated(Request $request): View
+    {
+        return view('auth.invitation-activated', [
+            'email' => $request->query('email'),
+            'role' => strtolower((string) $request->query('role', 'guardian')),
+        ]);
     }
 }

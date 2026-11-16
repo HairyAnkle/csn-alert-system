@@ -631,7 +631,7 @@
                             <td class="py-3.5 text-xs text-slate-500" x-text="e.location"></td>
                             <td class="py-3.5 text-xs text-slate-500">
                                 <span x-text="e.reportedAt"></span>
-                                <span x-show="e.status === 'pending' || e.status === 'responding'"
+                                <span x-show="e.status === 'pending' || e.status === 'responding' || e.status === 'arrived'"
                                       class="ml-1.5 inline-flex items-center rounded bg-rose-50 px-1.5 py-0.5 font-mono text-[11px] font-bold text-rose-700 border border-rose-200"
                                       x-text="getElapsedTimer(e)"></span>
                             </td>
@@ -640,10 +640,10 @@
                                       :class="{
                                           'bg-critical-50 text-critical-700 border border-critical-200': e.status === 'pending',
                                           'bg-amber-50 text-amber-700 border border-amber-200': e.status === 'responding',
-                                          'bg-emerald-50 text-emerald-700 border border-emerald-200': e.status === 'resolved',
+                                          'bg-emerald-50 text-emerald-700 border border-emerald-200': e.status === 'resolved' || e.status === 'arrived',
                                           'bg-slate-100 text-slate-600 border border-slate-200': e.status === 'cancelled'
                                       }"
-                                      x-text="e.status === 'responding' && e.responder ? 'On the Way' : e.status"></span>
+                                      x-text="e.status === 'arrived' ? 'Responder Arrived ✓' : (e.status === 'responding' && e.responder ? 'On the Way' : e.status)"></span>
                             </td>
                             <td class="py-3.5 text-right pr-2 whitespace-nowrap">
                                 <button x-show="e.lat !== null && e.lng !== null"

@@ -227,10 +227,12 @@ class UserManagementTest extends TestCase
     {
         $user = User::factory()->create([
             'email' => 'invitee@csn.gov.ph',
+            'role' => 'admin',
             'is_active' => false,
             'status' => 'inactive',
             'password' => Hash::make('temporary-unusable-pass'),
         ]);
+        $user->assignRole('admin');
 
         $signedUrl = URL::temporarySignedRoute(
             'invitation.accept',
@@ -319,5 +321,77 @@ class UserManagementTest extends TestCase
         $user = User::where('email', 'aki.test@csn.gov.ph')->first();
         $this->assertNotNull($user);
         $this->assertTrue($user->hasRole('admin'));
+    }
+
+    public function test_superadmin_can_create_teacher_user_account(): void
+    {
+        Notification::fake();
+
+        $superadmin = $this->createSuperadmin();
+
+        $response = $this->actingAs($superadmin)->postJson('/users', [
+            'name' => 'Teacher Clara Reyes',
+            'email' => 'clara.teacher@csn.gov.ph',
+            'role' => 'teacher',
+            'phone' => '+63 917 222 0002',
+            'status' => 'active',
+            'send_invite' => false,
+            'password' => 'Secret1234!',
+        ]);
+
+        $response->assertStatus(201);
+        $response->assertJsonFragment(['name' => 'Teacher Clara Reyes', 'role' => 'teacher']);
+
+        $user = User::where('email', 'clara.teacher@csn.gov.ph')->first();
+        $this->assertNotNull($user);
+        $this->assertEquals('teacher', $user->role);
+        $this->assertTrue($user->hasRole('teacher'));
+    }
+
+    public function test_teacher_invitation_activates_account_and_redirects_to_mobile_app_notice_without_web_login(): void
+    {
+        $teacher = User::factory()->create([
+            'email' => 'invited.teacher@csn.gov.ph',
+            'role' => 'teacher',
+            'is_active' => false,
+            'status' => 'inactive',
+            'password' => Hash::make('temporary-unusable-pass'),
+        ]);
+        $teacher->assignRole('teacher');
+
+        $signedUrl = URL::temporarySignedRoute(
+            'invitation.accept',
+            now()->addDays(3),
+            ['user' => $teacher->id]
+        );
+
+        $viewResponse = $this->get($signedUrl);
+        $viewResponse->assertOk();
+        $viewResponse->assertSee('CSN Teacher (Mobile App)');
+        $viewResponse->assertSee('Activate Mobile App Account');
+
+        $postResponse = $this->post($signedUrl, [
+            'password' => 'TeacherPass123!',
+            'password_confirmation' => 'TeacherPass123!',
+        ]);
+
+        $postResponse->assertRedirect(route('invitation.activated', [
+            'email' => $teacher->email,
+            'role' => 'teacher',
+        ]));
+        $this->assertGuest();
+
+        $teacher->refresh();
+        $this->assertTrue($teacher->is_active);
+        $this->assertEquals('active', $teacher->status);
+        $this->assertTrue(Hash::check('TeacherPass123!', $teacher->password));
+
+        // Teacher cannot log into the Web Command Center
+        $webLoginRes = $this->post('/login', [
+            'email' => 'invited.teacher@csn.gov.ph',
+            'password' => 'TeacherPass123!',
+        ]);
+        $webLoginRes->assertSessionHasErrors('email');
+        $this->assertGuest();
     }
 }

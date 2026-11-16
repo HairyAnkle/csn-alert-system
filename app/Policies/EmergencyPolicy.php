@@ -12,11 +12,13 @@ class EmergencyPolicy
      */
     public function view(User $user, Emergency $emergency): bool
     {
-        if (in_array(strtolower((string) $user->role), ['superadmin', 'admin', 'responder'], true)) {
+        if ($user->hasRole(['superadmin', 'admin', 'responder', 'teacher'])) {
             return true;
         }
 
-        return $user->id === $emergency->guardian_id;
+        return $user->id === $emergency->guardian_id
+            || $user->id === $emergency->reported_by_id
+            || ($emergency->child_id && $user->children()->where('id', $emergency->child_id)->exists());
     }
 
     /**
@@ -24,11 +26,13 @@ class EmergencyPolicy
      */
     public function update(User $user, Emergency $emergency): bool
     {
-        if (in_array(strtolower((string) $user->role), ['superadmin', 'admin', 'responder'], true)) {
+        if ($user->hasRole(['superadmin', 'admin', 'responder', 'teacher'])) {
             return true;
         }
 
-        return $user->id === $emergency->guardian_id;
+        return $user->id === $emergency->guardian_id
+            || $user->id === $emergency->reported_by_id
+            || ($emergency->child_id && $user->children()->where('id', $emergency->child_id)->exists());
     }
 
     /**
@@ -36,10 +40,26 @@ class EmergencyPolicy
      */
     public function cancel(User $user, Emergency $emergency): bool
     {
-        if (in_array(strtolower((string) $user->role), ['superadmin', 'admin'], true)) {
+        if ($user->hasRole(['superadmin', 'admin', 'teacher'])) {
             return true;
         }
 
-        return $user->id === $emergency->guardian_id;
+        return $user->id === $emergency->guardian_id
+            || $user->id === $emergency->reported_by_id
+            || ($emergency->child_id && $user->children()->where('id', $emergency->child_id)->exists());
+    }
+
+    /**
+     * Determine whether the user can confirm responder arrival on scene.
+     */
+    public function arrive(User $user, Emergency $emergency): bool
+    {
+        if ($user->hasRole(['superadmin', 'admin', 'responder', 'teacher'])) {
+            return true;
+        }
+
+        return $user->id === $emergency->guardian_id
+            || $user->id === $emergency->reported_by_id
+            || ($emergency->child_id && $user->children()->where('id', $emergency->child_id)->exists());
     }
 }

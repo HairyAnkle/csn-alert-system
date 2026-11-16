@@ -334,4 +334,142 @@ class GuardianMobileApiTest extends TestCase
         $resUnknown->assertStatus(200)
             ->assertJsonPath('message', 'If that email address is registered, a password reset link has been sent.');
     }
+
+    public function test_teacher_can_register_login_list_all_students_and_trigger_facility_alert_notifying_guardian_and_admin(): void
+    {
+        $guardian = User::factory()->create([
+            'name' => 'Maria Parent',
+            'email' => 'maria.parent@example.com',
+            'phone' => '09171112233',
+            'role' => 'guardian',
+        ]);
+
+        $student1 = ChildProfile::create([
+            'name' => 'Mateo Garcia',
+            'age' => 8,
+            'condition' => 'Autism Spectrum Disorder',
+            'guardian_id' => $guardian->id,
+            'guardian_name' => 'Maria Parent',
+            'guardian_phone' => '09171112233',
+            'emergency_contact' => '09171112233',
+        ]);
+
+        $student2 = ChildProfile::create([
+            'name' => 'Sofia Mendoza',
+            'age' => 9,
+            'condition' => 'Epilepsy',
+            'emergency_contact' => '09182223344',
+        ]);
+
+        // 1. Public /api/auth/register always creates a guardian account even if role=teacher is supplied
+        $publicRegRes = $this->postJson('/api/auth/register', [
+            'name' => 'Self Registered User',
+            'email' => 'selfreg@example.com',
+            'password' => 'secretPassword123',
+            'role' => 'teacher',
+        ]);
+        $publicRegRes->assertStatus(201)
+            ->assertJsonPath('user.role', 'guardian');
+
+        // 2. Superadmin-provisioned teacher account logs in and lists all enrolled students
+        User::create([
+            'name' => 'Teacher Clara Reyes',
+            'email' => 'teacher.clara@csn.gov.ph',
+            'password' => bcrypt('secretPassword123'),
+            'role' => 'teacher',
+            'status' => 'active',
+            'is_active' => true,
+        ]);
+
+        $loginRes = $this->postJson('/api/auth/login', [
+            'email' => 'teacher.clara@csn.gov.ph',
+            'password' => 'secretPassword123',
+        ]);
+        $loginRes->assertStatus(200)
+            ->assertJsonPath('user.role', 'teacher')
+            ->assertJsonCount(2, 'children');
+
+        $teacherToken = $loginRes->json('token');
+
+        $childrenRes = $this->withHeader('Authorization', "Bearer {$teacherToken}")
+            ->getJson('/api/children');
+        $childrenRes->assertStatus(200)
+            ->assertJsonCount(2, 'children')
+            ->assertJsonFragment(['name' => 'Mateo Garcia'])
+            ->assertJsonFragment(['name' => 'Sofia Mendoza']);
+
+        // 3. Teacher triggers emergency alert for selected student and CSN facility/room
+        $alertRes = $this->withHeader('Authorization', "Bearer {$teacherToken}")
+            ->postJson('/api/emergencies', [
+                'child_id' => $student1->id,
+                'facility_room' => 'Sensory Integration Room',
+                'type' => 'seizure_sensory',
+                'urgency' => 'high',
+                'message' => 'Student having sensory overload episode in room.',
+            ]);
+
+        $alertRes->assertStatus(201)
+            ->assertJsonPath('emergency.child_id', $student1->id)
+            ->assertJsonPath('emergency.facility_room', 'Sensory Integration Room')
+            ->assertJsonPath('emergency.reported_by_role', 'teacher')
+            ->assertJsonPath('emergency.location', 'CSN Center Parañaque — Sensory Integration Room');
+
+        $emergencyId = $alertRes->json('emergency.id');
+
+        $this->assertDatabaseHas('emergencies', [
+            'id' => $emergencyId,
+            'child_id' => $student1->id,
+            'guardian_id' => $guardian->id,
+            'reported_by_role' => 'teacher',
+            'facility_room' => 'Sensory Integration Room',
+        ]);
+
+        // Guardian receives the active emergency on /api/me and /api/emergencies, plus an announcement
+        $guardianToken = $guardian->createToken('guardian-app')->plainTextToken;
+
+        $guardianMe = $this->withHeader('Authorization', "Bearer {$guardianToken}")
+            ->getJson('/api/me');
+        $guardianMe->assertStatus(200)
+            ->assertJsonPath('active_emergency.id', $emergencyId)
+            ->assertJsonPath('active_emergency.facility_room', 'Sensory Integration Room')
+            ->assertJsonPath('active_emergency.reported_by_role', 'teacher');
+
+        $guardianEmergencies = $this->withHeader('Authorization', "Bearer {$guardianToken}")
+            ->getJson('/api/emergencies');
+        $guardianEmergencies->assertStatus(200)
+            ->assertJsonFragment(['id' => $emergencyId]);
+
+        $this->assertDatabaseHas('announcements', [
+            'title' => '🚨 CSN Center Alert: Mateo Garcia (Seizure / Sensory)',
+        ]);
+    }
+
+    public function test_guardian_can_confirm_responder_arrived_via_mobile_api(): void
+    {
+        $guardian = User::factory()->create(['role' => 'guardian']);
+        $token = $guardian->createToken('mobile')->plainTextToken;
+
+        $emergency = Emergency::create([
+            'guardian_id' => $guardian->id,
+            'type' => 'medical_crisis',
+            'urgency' => 'high',
+            'status' => 'responding',
+            'location' => 'Brgy. San Antonio, Parañaque City',
+            'reported_at' => now(),
+        ]);
+
+        $arrivedRes = $this->withHeader('Authorization', "Bearer {$token}")
+            ->postJson("/api/emergencies/{$emergency->id}/arrived");
+
+        $arrivedRes->assertStatus(200)
+            ->assertJsonPath('emergency.status', 'arrived');
+
+        $emergency->refresh();
+        $this->assertSame('arrived', $emergency->status);
+        $this->assertNotNull($emergency->responder_arrived_at);
+
+        $frontend = $emergency->toFrontendArray();
+        $this->assertSame('arrived', $frontend['status']);
+        $this->assertNotNull($frontend['responderArrivedAt']);
+    }
 }

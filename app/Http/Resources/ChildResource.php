@@ -19,12 +19,17 @@ class ChildResource extends JsonResource
             'name' => $this->name,
             'age' => $this->age,
             'disability' => $this->condition,
+            'condition' => $this->condition,
+            'address' => $this->address ?? 'Parañaque City',
+            'guardian_id' => $this->guardian_id,
+            'guardian_name' => $this->relationLoaded('guardian') && $this->guardian ? $this->guardian->name : ($this->guardian_name ?? ''),
             'allergies' => $this->allergies,
             'medications' => $this->medications,
             'communication_notes' => $this->communication_notes,
-            'guardian_phone' => $this->guardian_phone,
+            'guardian_phone' => $this->guardian_phone ?: ($this->relationLoaded('guardian') && $this->guardian ? ($this->guardian->phone ?? '') : ''),
             'emergency_contact_name' => $this->emergency_contact_name,
-            'emergency_contact_phone' => $this->emergency_contact_phone,
+            'emergency_contact_phone' => $this->emergency_contact_phone ?: ($this->emergency_contact ?? ''),
+            'avatar_initials' => $this->avatar_initials,
         ];
     }
 }

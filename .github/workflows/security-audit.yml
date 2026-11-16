@@ -1,0 +1,40 @@
+name: Security Architecture Audit & Regression Tests
+
+on:
+  push:
+    branches: [ "web-app", "main" ]
+  pull_request:
+    branches: [ "web-app", "main" ]
+
+jobs:
+  security-tests:
+    name: Security Tests & Code Style
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.4
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, iconv, intl, pdo_sqlite, bcmath, curl
+          coverage: none
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare Test Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Audit Composer Dependencies (SAST / CVE Scan)
+        run: composer audit
+
+      - name: Verify Code Style (Laravel Pint)
+        run: vendor/bin/pint --test
+
+      - name: Execute Security & Functional PHPUnit Suite
+        run: vendor/bin/phpunit

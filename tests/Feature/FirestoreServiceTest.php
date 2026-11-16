@@ -6,7 +6,9 @@ namespace Tests\Feature;
 
 use App\Models\Emergency;
 use App\Services\FirestoreService;
+use Google\Auth\FetchAuthTokenInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Mockery;
 use Tests\TestCase;
 
 class FirestoreServiceTest extends TestCase
@@ -45,12 +47,32 @@ class FirestoreServiceTest extends TestCase
 
     public function test_service_account_can_generate_valid_access_token(): void
     {
-        $service = new FirestoreService;
+        $fetcher = Mockery::mock(FetchAuthTokenInterface::class);
+        $fetcher->shouldReceive('fetchAuthToken')
+            ->once()
+            ->andReturn(['access_token' => 'ya29.mock-firestore-oauth-token']);
+
+        $service = new FirestoreService(authTokenFetcher: $fetcher);
         $token = $service->getAccessToken();
 
-        $this->assertNotNull($token, 'OAuth access token should be fetched using ServiceAccountCredentials');
+        $this->assertNotNull($token, 'OAuth access token should be fetched via FetchAuthTokenInterface');
         $this->assertNotEmpty($token);
         $this->assertStringStartsWith('ya29.', $token);
+    }
+
+    public function test_get_access_token_returns_null_when_credentials_path_is_directory_or_missing(): void
+    {
+        $dirService = new FirestoreService(base_path());
+        $this->assertNull($dirService->getCredentialsPath());
+        $this->assertNull($dirService->getAccessToken());
+
+        $emptyService = new FirestoreService('');
+        $this->assertNull($emptyService->getCredentialsPath());
+        $this->assertNull($emptyService->getAccessToken());
+
+        $missingService = new FirestoreService(storage_path('app/firebase/does-not-exist.json'));
+        $this->assertNull($missingService->getCredentialsPath());
+        $this->assertNull($missingService->getAccessToken());
     }
 
     public function test_sync_emergency_formats_emergency_model_cleanly(): void

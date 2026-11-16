@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Models\Emergency;
 use Google\Auth\Credentials\ServiceAccountCredentials;
+use Google\Auth\FetchAuthTokenInterface;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -15,11 +16,53 @@ class FirestoreService
 
     protected ?string $credentialsPath;
 
-    public function __construct()
+    public function __construct(
+        ?string $credentialsPath = null,
+        ?string $projectId = null,
+        protected ?FetchAuthTokenInterface $authTokenFetcher = null,
+    ) {
+        $this->projectId = $projectId ?: (config('firebase.projects.app.project_id') ?: (env('FIREBASE_PROJECT_ID') ?: 'csn-paranaque'));
+
+        $rawPath = $credentialsPath
+            ?? config('firebase.projects.app.credentials')
+            ?? config('firebase.projects.app.credentials_path')
+            ?? (env('FIREBASE_CREDENTIALS') ?: env('GOOGLE_APPLICATION_CREDENTIALS'));
+
+        $this->credentialsPath = $this->resolveCredentialsFilePath($rawPath);
+    }
+
+    /**
+     * Resolve a configured credentials path to a readable file path, rejecting empty, JSON, or directory paths.
+     */
+    public function resolveCredentialsFilePath(mixed $rawPath): ?string
     {
-        $this->projectId = env('FIREBASE_PROJECT_ID', 'csn-paranaque');
-        $rawPath = config('firebase.projects.app.credentials') ?? env('FIREBASE_CREDENTIALS');
-        $this->credentialsPath = $rawPath && ! file_exists($rawPath) ? base_path($rawPath) : $rawPath;
+        if (! is_string($rawPath)) {
+            return null;
+        }
+
+        $trimmed = trim($rawPath);
+        if ($trimmed === '' || str_starts_with($trimmed, '{')) {
+            return null;
+        }
+
+        $isAbsolute = str_starts_with($trimmed, '/')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $trimmed) === 1;
+
+        $candidate = $isAbsolute ? $trimmed : base_path(ltrim($trimmed, '/\\'));
+
+        if (! is_file($candidate) || ! is_readable($candidate)) {
+            return null;
+        }
+
+        return $candidate;
+    }
+
+    /**
+     * Return the validated service account credentials file path, if available.
+     */
+    public function getCredentialsPath(): ?string
+    {
+        return $this->credentialsPath;
     }
 
     /**
@@ -27,8 +70,20 @@ class FirestoreService
      */
     public function getAccessToken(): ?string
     {
-        if (! $this->credentialsPath || ! file_exists($this->credentialsPath)) {
-            Log::warning('Firestore credentials path not found: '.$this->credentialsPath);
+        if ($this->authTokenFetcher !== null) {
+            try {
+                $tokenData = $this->authTokenFetcher->fetchAuthToken();
+
+                return is_array($tokenData) ? ($tokenData['access_token'] ?? null) : null;
+            } catch (\Throwable $e) {
+                Log::error('Failed to obtain Firestore OAuth access token: '.$e->getMessage());
+
+                return null;
+            }
+        }
+
+        if (! $this->credentialsPath || ! is_file($this->credentialsPath) || ! is_readable($this->credentialsPath)) {
+            Log::warning('Firestore credentials path not found or not a readable file: '.($this->credentialsPath ?? 'null'));
 
             return null;
         }

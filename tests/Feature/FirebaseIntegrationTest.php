@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Emergency;
 use App\Services\FcmNotificationService;
+use App\Services\FirestoreService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Kreait\Firebase\Contract\Auth;
 use Kreait\Firebase\Contract\Messaging;
@@ -18,10 +19,27 @@ class FirebaseIntegrationTest extends TestCase
      */
     public function test_firebase_credentials_exist_and_are_valid_json(): void
     {
-        $path = base_path(config('firebase.projects.app.credentials'));
+        $configured = config('firebase.projects.app.credentials') ?? config('firebase.projects.app.credentials_path');
+        $this->assertIsString($configured);
+        $this->assertNotSame('', trim($configured));
+
+        $service = new FirestoreService;
+        $this->assertNull($service->resolveCredentialsFilePath(base_path()));
+
+        $trimmed = trim($configured);
+        $isAbsolute = str_starts_with($trimmed, '/')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $trimmed) === 1;
+        $path = $isAbsolute ? $trimmed : base_path(ltrim($trimmed, '/\\'));
+
+        $this->assertFalse(is_dir($path), 'Firebase credentials path must not resolve to a directory.');
+
+        if (! is_file($path) || ! is_readable($path)) {
+            $this->markTestSkipped('Live Firebase service account JSON file is not configured; set FIREBASE_CREDENTIALS to run credential file inspection.');
+        }
+
         $this->assertFileExists($path);
 
-        $json = json_decode(file_get_contents($path), true);
+        $json = json_decode((string) file_get_contents($path), true);
         $this->assertIsArray($json);
         $this->assertEquals('service_account', $json['type'] ?? null);
         $this->assertEquals('csn-paranaque', $json['project_id'] ?? null);

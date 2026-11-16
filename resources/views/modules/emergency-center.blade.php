@@ -6,13 +6,12 @@
         <div class="flex flex-wrap gap-2" role="tablist" aria-label="Filter emergencies">
             @php
                 $filters = [
-                    ['key' => 'all', 'label' => 'All'],
+                    ['key' => 'all', 'label' => 'All Active'],
                     ['key' => 'high', 'label' => 'High Urgency'],
                     ['key' => 'low', 'label' => 'Low Urgency'],
                     ['key' => 'pending', 'label' => 'Pending'],
                     ['key' => 'responding', 'label' => 'Responding'],
-                    ['key' => 'resolved', 'label' => 'Resolved'],
-                    ['key' => 'cancelled', 'label' => 'Cancelled'],
+                    ['key' => 'arrived', 'label' => 'Responder Arrived'],
                 ];
             @endphp
             @foreach ($filters as $f)
@@ -39,17 +38,82 @@
         </button>
     </div>
 
+    {{-- Latest Incoming Emergency Notification Spotlight (Recent notification nasa unahan) --}}
+    <template x-if="filteredEmergencies.length > 0">
+        <div class="rounded-2xl border-2 p-4 sm:p-5 shadow-sm transition"
+             :class="filteredEmergencies[0].status === 'arrived'
+                ? 'border-emerald-500/70 bg-gradient-to-r from-emerald-50 via-white to-emerald-50/70'
+                : (filteredEmergencies[0].urgency === 'high'
+                    ? 'border-critical-500/70 bg-gradient-to-r from-rose-50 via-white to-rose-50/70'
+                    : 'border-amber-400/70 bg-gradient-to-r from-amber-50 via-white to-amber-50/70')">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="min-w-0 space-y-1.5">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-white"
+                              :class="filteredEmergencies[0].status === 'arrived' ? 'bg-emerald-600' : 'bg-critical-500'">
+                            <span class="h-1.5 w-1.5 rounded-full bg-white animate-ping"></span>
+                            <span>Latest Emergency Notification</span>
+                        </span>
+                        <span class="rounded-md bg-brand-700/10 px-2.5 py-0.5 text-xs font-bold text-brand-800"
+                              x-text="filteredEmergencies[0].type"></span>
+                        <span class="rounded-md px-2 py-0.5 text-xs font-semibold"
+                              :class="filteredEmergencies[0].urgency === 'high' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-800'"
+                              x-text="filteredEmergencies[0].urgency === 'high' ? 'High Urgency' : 'Low Urgency'"></span>
+                        <span x-show="filteredEmergencies[0].reportedByRole === 'teacher'"
+                              class="rounded-md bg-teal-100 border border-teal-200 px-2 py-0.5 text-xs font-semibold text-teal-800"
+                              x-text="'Reported by CSN Teacher' + (filteredEmergencies[0].reportedByName ? ' (' + filteredEmergencies[0].reportedByName + ')' : '')"></span>
+                        <span x-show="filteredEmergencies[0].status === 'arrived' || filteredEmergencies[0].responderArrivedAt"
+                              class="rounded-md bg-emerald-100 border border-emerald-200 px-2 py-0.5 text-xs font-bold text-emerald-800">
+                            ✓ Responder Arrived
+                        </span>
+                    </div>
+                    <p class="text-base font-bold text-slate-900 truncate">
+                        <span x-text="filteredEmergencies[0].child?.name || 'No profile on file'"></span>
+                        <span class="font-normal text-slate-500 text-sm" x-text="filteredEmergencies[0].child ? (' · ' + (filteredEmergencies[0].child.condition || 'General')) : ''"></span>
+                    </p>
+                    <p class="text-xs text-slate-600">
+                        <span class="font-semibold text-slate-800"
+                              x-text="filteredEmergencies[0].facilityRoom ? ('CSN Center — ' + filteredEmergencies[0].facilityRoom) : filteredEmergencies[0].location"></span>
+                        <span class="mx-1.5 text-slate-300">•</span>
+                        <span x-text="'Reported ' + filteredEmergencies[0].reportedAt"></span>
+                        <span class="mx-1.5 text-slate-300">•</span>
+                        <span class="font-mono font-bold text-rose-700" x-text="'Elapsed ' + getElapsedTimer(filteredEmergencies[0])"></span>
+                    </p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 shrink-0">
+                    <button type="button"
+                            @click="acknowledge(filteredEmergencies[0].id)"
+                            :disabled="filteredEmergencies[0].status !== 'pending'"
+                            class="min-h-[40px] rounded-xl px-3.5 text-xs font-semibold transition focus-ring disabled:opacity-40 disabled:cursor-not-allowed"
+                            :class="filteredEmergencies[0].status === 'pending' ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-400'">
+                        Acknowledge
+                    </button>
+                    <button type="button"
+                            @click="openDispatchModal(filteredEmergencies[0])"
+                            class="min-h-[40px] rounded-xl bg-brand-700 px-3.5 text-xs font-semibold text-white hover:bg-brand-800 transition focus-ring">
+                        <span x-text="filteredEmergencies[0].responder ? 'Reassign Unit' : 'Dispatch Responder'"></span>
+                    </button>
+                    <button type="button"
+                            @click="resolve(filteredEmergencies[0].id)"
+                            class="min-h-[40px] rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white hover:bg-emerald-700 transition focus-ring">
+                        Mark Resolved
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
     {{-- Empty state --}}
     <div x-show="filteredEmergencies.length === 0" x-cloak class="rounded-xl border border-dashed border-slate-300 bg-white p-10 text-center">
-        <p class="text-sm font-medium text-slate-600">No emergencies match this filter.</p>
-        <p class="mt-1 text-xs text-slate-400">Try a different filter, or click "Log Emergency" to report an active alert.</p>
+        <p class="text-sm font-medium text-slate-600">No active emergencies in the Emergency Center.</p>
+        <p class="mt-1 text-xs text-slate-400">Resolved and cancelled (false alarm) alerts are automatically removed here and archived in Incident Reports.</p>
     </div>
 
     {{-- Emergency cards --}}
     <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <template x-for="e in filteredEmergencies" :key="e.id">
             <div class="rounded-xl border bg-white p-5 shadow-sm transition"
-                 :class="e.urgency === 'high' && e.status !== 'resolved' && e.status !== 'cancelled' ? 'border-critical-500/40 ring-1 ring-critical-500/20' : 'border-slate-200'">
+                 :class="e.status === 'arrived' ? 'border-emerald-500/50 ring-1 ring-emerald-500/20' : (e.urgency === 'high' ? 'border-critical-500/40 ring-1 ring-critical-500/20' : 'border-slate-200')">
 
                 {{-- Header: type badge + urgency + live elapsed timer --}}
                 <div class="flex items-start justify-between gap-2">
@@ -60,7 +124,7 @@
                             <span class="h-1.5 w-1.5 rounded-full" :class="e.urgency === 'high' ? 'bg-critical-500 animate-pulse' : 'bg-amber-500'"></span>
                             <span x-text="e.urgency === 'high' ? 'High Urgency' : 'Low Urgency'"></span>
                         </span>
-                        <span x-show="e.status === 'pending' || e.status === 'responding'"
+                        <span x-show="e.status === 'pending' || e.status === 'responding' || e.status === 'arrived'"
                               class="inline-flex items-center gap-1 rounded-md bg-rose-50 border border-rose-200 px-2 py-0.5 text-xs font-mono font-bold text-rose-700"
                               title="Live elapsed time since emergency trigger">
                             <svg class="h-3.5 w-3.5 text-rose-500 animate-spin" style="animation-duration: 6s;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -74,29 +138,47 @@
                               'bg-amber-500/10 text-amber-700 ring-1 ring-amber-500/20': e.status === 'pending',
                               'bg-sky-500/10 text-sky-700 ring-1 ring-sky-500/20': e.status === 'responding' && !e.responder,
                               'bg-indigo-500/10 text-indigo-700 ring-1 ring-indigo-500/20': e.status === 'responding' && e.responder,
+                              'bg-emerald-500/15 text-emerald-700 ring-1 ring-emerald-500/30': e.status === 'arrived',
                               'bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20': e.status === 'resolved',
                               'bg-slate-500/10 text-slate-500': e.status === 'cancelled'
                           }"
-                          x-text="e.status === 'responding' && e.responder ? 'On the Way' : e.status"></span>
+                          x-text="e.status === 'arrived' ? 'Responder Arrived ✓' : (e.status === 'responding' && e.responder ? 'On the Way' : e.status)"></span>
+                </div>
+
+                {{-- Teacher / CSN Facility Room Notice --}}
+                <div x-show="e.reportedByRole === 'teacher' || e.facilityRoom" x-cloak
+                     class="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-teal-200 bg-teal-50/80 px-3 py-2 text-xs text-teal-900">
+                    <span class="font-semibold"
+                          x-text="'🏫 ' + (e.facilityRoom ? ('CSN Facility: ' + e.facilityRoom) : 'CSN Center Alert') + (e.reportedByName ? (' · Reported by ' + e.reportedByName) : '')"></span>
+                    <span class="rounded bg-teal-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-teal-800">
+                        Guardian &amp; Admin Notified
+                    </span>
+                </div>
+
+                {{-- Mobile Responder Arrived Confirmation Banner --}}
+                <div x-show="e.status === 'arrived' || e.responderArrivedAt" x-cloak
+                     class="mt-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                    <span class="font-bold">✓ RESPONDER ARRIVED ON SCENE — Confirmed by Mobile User (Parent/Teacher)</span>
+                    <span class="font-mono text-[11px] font-semibold text-emerald-700" x-text="e.responderArrivedAt || 'Just now'"></span>
                 </div>
 
                 {{-- 3-Stage Status Progression Bar (Table 1.17) --}}
                 <div class="mt-3.5 grid grid-cols-3 gap-1.5 text-[11px] font-semibold">
                     <div class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 border transition"
-                         :class="e.status === 'responding' || e.status === 'resolved'
+                         :class="e.status === 'responding' || e.status === 'arrived' || e.status === 'resolved'
                             ? 'bg-sky-50 border-sky-200 text-sky-800'
                             : (e.status === 'pending' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-slate-50 border-slate-200 text-slate-400')">
                         <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                              :class="e.status === 'responding' || e.status === 'resolved' ? 'bg-sky-600 text-white' : 'bg-amber-500 text-white'">1</span>
+                              :class="e.status === 'responding' || e.status === 'arrived' || e.status === 'resolved' ? 'bg-sky-600 text-white' : 'bg-amber-500 text-white'">1</span>
                         <span class="truncate" x-text="e.status === 'pending' ? 'Pending Desk' : 'Responding'"></span>
                     </div>
                     <div class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 border transition"
-                         :class="(e.responder && e.status === 'responding') || e.status === 'resolved'
+                         :class="(e.responder && e.status === 'responding') || e.status === 'arrived' || e.status === 'resolved'
                             ? 'bg-indigo-50 border-indigo-200 text-indigo-800'
                             : 'bg-slate-50 border-slate-200 text-slate-400'">
                         <span class="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
-                              :class="(e.responder && e.status === 'responding') || e.status === 'resolved' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'">2</span>
-                        <span class="truncate">On the Way</span>
+                              :class="(e.responder && e.status === 'responding') || e.status === 'arrived' || e.status === 'resolved' ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'">2</span>
+                        <span class="truncate" x-text="e.status === 'arrived' ? 'Arrived ✓' : 'On the Way'"></span>
                     </div>
                     <div class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 border transition"
                          :class="e.status === 'resolved'
@@ -119,7 +201,8 @@
                         </div>
                     </div>
                     <button type="button"
-                            @click="viewChildProfile(e)"
+                            x-show="e.child?.id || e.child_id"
+                            @click="viewChildProfile(e.child?.id || e.child_id)"
                             class="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-brand-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-brand-700 hover:bg-brand-50 shadow-2xs transition focus-ring">
                         <svg class="h-3.5 w-3.5 text-brand-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                         <span>Medical File</span>

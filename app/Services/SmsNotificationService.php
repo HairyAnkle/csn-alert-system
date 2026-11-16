@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Emergency;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -29,6 +30,31 @@ class SmsNotificationService
 
         if (! $recipientPhone) {
             Log::info("[SMS Notification] No phone number available for dispatch notification. Alert ID #{$emergency->id}: {$message}");
+
+            return false;
+        }
+
+        return $this->sendSms($recipientPhone, $message);
+    }
+
+    /**
+     * Send SMS notification to the child's guardian when a CSN teacher triggers an alert.
+     */
+    public function notifyGuardianOfTeacherAlert(Emergency $emergency, ?User $teacher = null): bool
+    {
+        $emergency->loadMissing(['child.guardian']);
+
+        $recipientPhone = $emergency->child?->guardian_phone
+            ?? $emergency->child?->guardian?->phone
+            ?? $emergency->child?->emergency_contact_phone
+            ?? $emergency->child?->emergency_contact;
+
+        $teacherName = $teacher?->name ?? 'CSN Teacher';
+        $childName = $emergency->child?->name ?? 'your child';
+        $message = "CSN CENTER ALERT: {$teacherName} reported a {$emergency->type_label} episode for {$childName} at {$emergency->location}. Please check your CSN Mobile App or contact CSN Center immediately.";
+
+        if (! $recipientPhone) {
+            Log::info("[SMS Guardian Notification] No guardian phone available for Alert ID #{$emergency->id}: {$message}");
 
             return false;
         }

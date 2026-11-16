@@ -31,6 +31,7 @@
             ['key' => 'superadmin', 'label' => 'Superadmin'],
             ['key' => 'admin', 'label' => 'Client Admins'],
             ['key' => 'guardian', 'label' => 'Guardians (Mobile App)'],
+            ['key' => 'teacher', 'label' => 'CSN Teachers (Mobile App)'],
             ['key' => 'responder', 'label' => 'Barangay Responders'],
         ] as $r)
             <button type="button" @click="roleTab = '{{ $r['key'] }}'"
@@ -64,6 +65,7 @@
                                     <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white uppercase shadow-sm"
                                          :class="{
                                              'bg-sky-600': user.role === 'guardian',
+                                             'bg-teal-600': user.role === 'teacher',
                                              'bg-brand-700': user.role === 'admin',
                                              'bg-amber-600': user.role === 'responder',
                                              'bg-purple-700': user.role === 'superadmin'
@@ -82,11 +84,12 @@
                                 <span class="inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold capitalize"
                                       :class="{
                                           'bg-sky-50 text-sky-700 ring-1 ring-sky-200': user.role === 'guardian',
+                                          'bg-teal-50 text-teal-700 ring-1 ring-teal-200': user.role === 'teacher',
                                           'bg-brand-50 text-brand-800 ring-1 ring-brand-200': user.role === 'admin',
                                           'bg-amber-50 text-amber-700 ring-1 ring-amber-200': user.role === 'responder',
                                           'bg-purple-50 text-purple-700 ring-1 ring-purple-200': user.role === 'superadmin'
                                       }"
-                                      x-text="user.role === 'superadmin' ? 'Superadmin' : (user.role === 'admin' ? 'Client Admin' : (user.role === 'responder' ? 'Barangay Responder' : (user.role === 'guardian' ? 'Guardian (Mobile)' : user.role)))"></span>
+                                      x-text="user.role === 'superadmin' ? 'Superadmin' : (user.role === 'admin' ? 'Client Admin' : (user.role === 'responder' ? 'Barangay Responder' : (user.role === 'teacher' ? 'CSN Teacher (Mobile)' : (user.role === 'guardian' ? 'Guardian (Mobile)' : user.role))))"></span>
                             </td>
 
                             {{-- Phone --}}
@@ -185,6 +188,7 @@
                             <option value="admin">Client Admin (Web Command Center)</option>
                             <option value="superadmin">Superadmin (System Developer / Owner)</option>
                             <option value="guardian">Guardian (Mobile App User)</option>
+                            <option value="teacher">CSN Teacher (Mobile App User)</option>
                             <option value="responder">Barangay Responder Unit</option>
                         </select>
                     </div>
@@ -289,6 +293,7 @@
                                     <option value="admin">Client Admin (Web Command Center)</option>
                                     <option value="superadmin">Superadmin (System Developer / Owner)</option>
                                     <option value="guardian">Guardian (Mobile App User)</option>
+                                    <option value="teacher">CSN Teacher (Mobile App User)</option>
                                     <option value="responder">Barangay Responder Unit</option>
                                 </select>
                             </div>

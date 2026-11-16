@@ -28,16 +28,18 @@ Route::prefix('auth')->group(function () {
     Route::post('phone/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:10,1');
 });
 
-Route::middleware(['auth:sanctum', 'role:guardian'])->group(function () {
+Route::middleware(['auth:sanctum', 'role:guardian|teacher'])->group(function () {
     Route::post('auth/logout', [AuthController::class, 'logout']);
     Route::get('me', [AuthController::class, 'me']);
 
+    Route::get('children', [ChildController::class, 'index']);
     Route::put('child', [ChildController::class, 'update']);
 
     Route::get('emergencies', [EmergencyController::class, 'index']);
     Route::post('emergencies', [EmergencyController::class, 'store'])->middleware('throttle:6,1');
     Route::get('emergencies/{emergency}', [EmergencyController::class, 'show']);
     Route::patch('emergencies/{emergency}/location', [EmergencyController::class, 'location'])->middleware('throttle:60,1');
+    Route::post('emergencies/{emergency}/arrived', [EmergencyController::class, 'arrived']);
     Route::post('emergencies/{emergency}/cancel', [EmergencyController::class, 'cancel']);
 
     Route::get('announcements', [AnnouncementController::class, 'index']);

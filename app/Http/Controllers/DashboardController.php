@@ -17,8 +17,9 @@ class DashboardController extends Controller
      */
     public function index(): View
     {
-        $emergencies = Emergency::with(['child', 'responder'])
+        $emergencies = Emergency::with(['child', 'responder', 'reporter'])
             ->latest('reported_at')
+            ->latest('id')
             ->get()
             ->map(fn (Emergency $e) => $e->toFrontendArray())
             ->values();
@@ -55,13 +56,14 @@ class DashboardController extends Controller
                 $tone = match ($e->status) {
                     'pending' => 'critical',
                     'responding' => 'warning',
-                    'resolved' => 'success',
+                    'arrived', 'resolved' => 'success',
                     default => 'warning',
                 };
 
                 $text = match ($e->status) {
                     'pending' => "Emergency alert reported for {$childName} ({$e->type}) at {$e->location}.",
                     'responding' => "Responder dispatched to {$e->location} for {$childName}.",
+                    'arrived' => "Responder arrived on scene at {$e->location} for {$childName} (confirmed via mobile app).",
                     'resolved' => "Emergency resolved for {$childName}. Situation stabilized.",
                     default => "Alert updated for {$childName}.",
                 };

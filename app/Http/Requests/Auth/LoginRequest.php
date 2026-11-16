@@ -59,7 +59,7 @@ class LoginRequest extends FormRequest
                 RateLimiter::hit($this->throttleKey());
 
                 throw ValidationException::withMessages([
-                    'email' => 'Access denied. The Web Command Center is reserved for CSN Administrators only. Guardians should use the mobile app.',
+                    'email' => 'Access denied. The Web Command Center is reserved for CSN Administrators only. Guardians and CSN Teachers should use the mobile app.',
                 ]);
             }
         }

@@ -344,4 +344,51 @@ class EmergencyCenterTest extends TestCase
         $this->assertEquals('BF Homes', $bfHomes['barangay']);
         $this->assertEquals('District 2', $bfHomes['district']);
     }
+
+    public function test_emergencies_are_ordered_most_recent_first_and_emergency_center_excludes_resolved_and_cancelled(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+
+        $older = Emergency::factory()->create([
+            'status' => 'pending',
+            'reported_at' => now()->subMinutes(20),
+        ]);
+        $newest = Emergency::factory()->create([
+            'status' => 'pending',
+            'facility_room' => 'Sensory Integration Room',
+            'reported_by_role' => 'teacher',
+            'reported_at' => now(),
+        ]);
+
+        $listResponse = $this->actingAs($admin)->getJson('/emergencies');
+        $listResponse->assertOk();
+        $ids = collect($listResponse->json())->pluck('id')->all();
+        $this->assertSame([$newest->id, $older->id], $ids);
+
+        $viewResponse = $this->actingAs($admin)->get('/');
+        $viewResponse->assertOk();
+        $viewResponse->assertSee('Latest Emergency Notification');
+        $viewResponse->assertSee("e.status !== 'resolved' && e.status !== 'cancelled'", false);
+        $viewResponse->assertSee('Responder Arrived');
+    }
+
+    public function test_admin_can_mark_responder_arrived_from_web_endpoint(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $admin->assignRole('admin');
+
+        $emergency = Emergency::factory()->create([
+            'status' => 'responding',
+            'responder_arrived_at' => null,
+        ]);
+
+        $response = $this->actingAs($admin)->patchJson("/emergencies/{$emergency->id}/arrived");
+        $response->assertOk()
+            ->assertJsonPath('status', 'arrived');
+
+        $emergency->refresh();
+        $this->assertEquals('arrived', $emergency->status);
+        $this->assertNotNull($emergency->responder_arrived_at);
+    }
 }

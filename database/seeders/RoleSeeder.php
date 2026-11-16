@@ -16,7 +16,7 @@ class RoleSeeder extends Seeder
         // Reset cached roles and permissions
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
 
-        $roles = ['superadmin', 'admin', 'guardian', 'responder'];
+        $roles = ['superadmin', 'admin', 'guardian', 'teacher', 'responder'];
 
         foreach ($roles as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);

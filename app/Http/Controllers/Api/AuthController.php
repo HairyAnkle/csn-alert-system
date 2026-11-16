@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ChildResource;
+use App\Http\Resources\EmergencyResource;
+use App\Models\ChildProfile;
+use App\Models\Emergency;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,11 +17,12 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\Models\Role;
 
 class AuthController extends Controller
 {
     /**
-     * Authenticate guardian and return Sanctum API token.
+     * Authenticate guardian or CSN teacher and return Sanctum API token.
      */
     public function login(Request $request): JsonResponse
     {
@@ -29,8 +33,13 @@ class AuthController extends Controller
 
         $user = User::where('email', $data['email'])->first();
 
+        $hasMobileRole = $user && (
+            $user->hasRole(['guardian', 'teacher'])
+            || in_array(strtolower((string) $user->role), ['guardian', 'teacher'], true)
+        );
+
         if (! $user || ! Hash::check($data['password'], $user->password)
-            || ! $user->is_active || ! $user->hasRole('guardian')) {
+            || ! $user->is_active || ! $hasMobileRole) {
             throw ValidationException::withMessages([
                 'email' => ['These credentials do not match our records.'],
             ]);
@@ -40,7 +49,7 @@ class AuthController extends Controller
     }
 
     /**
-     * Register a new guardian account.
+     * Register a new guardian account (Teacher accounts are provisioned by Superadmin).
      */
     public function register(Request $request): JsonResponse
     {
@@ -51,21 +60,19 @@ class AuthController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
+        $role = 'guardian';
+
         $user = User::create([
             'name' => $data['name'],
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'password' => Hash::make($data['password']),
-            'role' => 'guardian',
+            'role' => $role,
             'status' => 'active',
             'is_active' => true,
         ]);
 
-        try {
-            $user->assignRole('guardian');
-        } catch (\Throwable $e) {
-            // Role may already be handled via User model
-        }
+        $this->ensureAndAssignRole($user, $role);
 
         return $this->tokenResponse($user, 201);
     }
@@ -99,7 +106,7 @@ class AuthController extends Controller
         $idToken = $request->input('id_token') ?? $request->input('idToken') ?? $request->input('token') ?? $request->input('credential');
         $email = $request->input('email');
         $name = $request->input('name');
-        $role = $request->input('role', 'guardian');
+        $role = 'guardian';
 
         if ($idToken) {
             // 1. Try Firebase Auth verification
@@ -151,25 +158,20 @@ class AuthController extends Controller
             }
         }
 
-        if (! $user->hasRole($role)) {
-            try {
-                $user->assignRole($role);
-            } catch (\Throwable $e) {
-                // Ignore if Spatie role already assigned
-            }
+        if (! $user->hasRole(['guardian', 'teacher', 'responder'])) {
+            $this->ensureAndAssignRole($user, $role);
         }
 
         return $this->tokenResponse($user);
     }
 
     /**
-     * Authenticate or register a mobile guardian/responder using a Firebase ID token.
+     * Authenticate or register a mobile guardian/teacher/responder using a Firebase ID token.
      */
     public function firebase(Request $request): JsonResponse
     {
         $data = $request->validate([
             'id_token' => 'required|string',
-            'role' => 'nullable|string|in:guardian,responder',
             'phone' => 'nullable|string',
             'name' => 'nullable|string',
         ]);
@@ -182,7 +184,7 @@ class AuthController extends Controller
             $firebasePhone = $verifiedIdToken->claims()->get('phone_number') ?? $request->input('phone');
             $email = $firebaseEmail ?? ($firebasePhone ? preg_replace('/[^0-9]/', '', $firebasePhone).'@csn.mobile' : "{$uid}@firebase.user");
             $name = $verifiedIdToken->claims()->get('name') ?? $request->input('name') ?? ($firebasePhone ? 'Guardian '.$firebasePhone : 'CSN Mobile User');
-            $role = $data['role'] ?? 'guardian';
+            $role = 'guardian';
 
             $user = User::where('email', $email)
                 ->when($firebasePhone, fn ($q) => $q->orWhere('phone', $firebasePhone))
@@ -204,12 +206,8 @@ class AuthController extends Controller
                 }
             }
 
-            if (! $user->hasRole($role)) {
-                try {
-                    $user->assignRole($role);
-                } catch (\Throwable $e) {
-                    // Spatie role assignment fallback
-                }
+            if (! $user->hasRole(['guardian', 'teacher', 'responder'])) {
+                $this->ensureAndAssignRole($user, $role);
             }
 
             return $this->tokenResponse($user);
@@ -228,7 +226,6 @@ class AuthController extends Controller
         $data = $request->validate([
             'phone' => 'required|string',
             'name' => 'nullable|string',
-            'role' => 'nullable|string|in:guardian,responder',
         ]);
 
         $rawPhone = preg_replace('/[^0-9+]/', '', $data['phone']);
@@ -249,7 +246,7 @@ class AuthController extends Controller
         }
 
         $storedPhone = str_starts_with($rawPhone, '+') ? $e164 : $normalized;
-        $role = $data['role'] ?? 'guardian';
+        $role = 'guardian';
         $providedName = trim((string) ($data['name'] ?? ''));
         $name = ! empty($providedName) ? $providedName : 'Guardian '.$storedPhone;
         $email = $normalized.'@csn.mobile';
@@ -284,19 +281,15 @@ class AuthController extends Controller
             }
         }
 
-        if (! $user->hasRole($role)) {
-            try {
-                $user->assignRole($role);
-            } catch (\Throwable $e) {
-                // Spatie role assignment fallback
-            }
+        if (! $user->hasRole(['guardian', 'teacher', 'responder'])) {
+            $this->ensureAndAssignRole($user, $role);
         }
 
         return $this->tokenResponse($user);
     }
 
     /**
-     * Log out guardian and revoke current access token.
+     * Log out guardian/teacher and revoke current access token.
      */
     public function logout(Request $request): JsonResponse
     {
@@ -308,22 +301,11 @@ class AuthController extends Controller
     }
 
     /**
-     * Get authenticated guardian profile and associated child.
+     * Get authenticated mobile user profile, associated child/children, and active emergency.
      */
     public function me(Request $request): JsonResponse
     {
-        $user = $request->user();
-
-        return response()->json([
-            'guardian' => [
-                'id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'phone' => $user->phone ?? '',
-                'role' => $user->role ?? 'guardian',
-            ],
-            'child' => $user->child ? (new ChildResource($user->child))->resolve() : null,
-        ]);
+        return response()->json($this->buildProfilePayload($request->user()));
     }
 
     /**
@@ -415,7 +397,6 @@ class AuthController extends Controller
             'otp' => 'nullable|string',
             'id_token' => 'nullable|string',
             'name' => 'nullable|string',
-            'role' => 'nullable|string|in:guardian,responder',
         ]);
 
         $phoneInfo = $this->normalizePhilippineNumber($data['phone']);
@@ -461,7 +442,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $role = $data['role'] ?? 'guardian';
+        $role = 'guardian';
         $providedName = trim((string) ($data['name'] ?? ''));
         $name = ! empty($providedName) ? $providedName : 'Guardian '.$e164;
         $email = $normalized.'@csn.mobile';
@@ -494,12 +475,8 @@ class AuthController extends Controller
             }
         }
 
-        if (! $user->hasRole($role)) {
-            try {
-                $user->assignRole($role);
-            } catch (\Throwable $e) {
-                // Ignore Spatie duplicate assignment
-            }
+        if (! $user->hasRole(['guardian', 'teacher', 'responder'])) {
+            $this->ensureAndAssignRole($user, $role);
         }
 
         return $this->tokenResponse($user);
@@ -633,23 +610,76 @@ class AuthController extends Controller
     }
 
     /**
-     * Build token and profile response payload.
+     * Ensure Spatie role exists for both web and sanctum guards and assign it.
      */
-    private function tokenResponse(User $user, int $status = 200): JsonResponse
+    private function ensureAndAssignRole(User $user, string $role): void
     {
+        try {
+            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
+            Role::firstOrCreate(['name' => $role, 'guard_name' => 'sanctum']);
+            $user->assignRole($role);
+        } catch (\Throwable $e) {
+            // Role may already be handled via User model column
+        }
+    }
+
+    /**
+     * Build profile, children list, and active emergency payload.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildProfilePayload(User $user): array
+    {
+        $isTeacher = $user->hasRole('teacher') || strtolower((string) $user->role) === 'teacher';
+
         $userData = [
             'id' => $user->id,
             'name' => $user->name,
             'email' => $user->email,
             'phone' => $user->phone ?? '',
-            'role' => $user->role ?? 'guardian',
+            'role' => $isTeacher ? 'teacher' : ($user->role ?? 'guardian'),
         ];
 
-        return response()->json([
-            'token' => $user->createToken('mobile')->plainTextToken,
+        $children = $isTeacher
+            ? ChildResource::collection(ChildProfile::with('guardian')->orderBy('name')->get())->resolve()
+            : ($user->children()->exists()
+                ? ChildResource::collection($user->children()->with('guardian')->orderBy('name')->get())->resolve()
+                : []);
+
+        $childIds = $user->children()->pluck('id');
+        $activeEmergency = Emergency::active()
+            ->with(['child.guardian', 'responder', 'reporter'])
+            ->where(function ($q) use ($user, $isTeacher, $childIds) {
+                if ($isTeacher) {
+                    $q->where('reported_by_id', $user->id);
+                } else {
+                    $q->where('guardian_id', $user->id);
+                    if ($childIds->isNotEmpty()) {
+                        $q->orWhereIn('child_id', $childIds);
+                    }
+                }
+            })
+            ->latest('reported_at')
+            ->latest('id')
+            ->first();
+
+        return [
             'user' => $userData,
             'guardian' => $userData,
-            'child' => $user->child ? (new ChildResource($user->child))->resolve() : null,
+            'child' => $user->child ? (new ChildResource($user->child->loadMissing('guardian')))->resolve() : null,
+            'children' => $children,
+            'active_emergency' => $activeEmergency ? (new EmergencyResource($activeEmergency))->resolve() : null,
+        ];
+    }
+
+    /**
+     * Build token and profile response payload.
+     */
+    private function tokenResponse(User $user, int $status = 200): JsonResponse
+    {
+        return response()->json([
+            'token' => $user->createToken('mobile')->plainTextToken,
+            ...$this->buildProfilePayload($user),
         ], $status);
     }
 }

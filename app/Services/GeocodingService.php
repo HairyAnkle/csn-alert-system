@@ -243,44 +243,46 @@ class GeocodingService
         $pipBarangay = $this->findBarangayByCoordinates($lat, $lng);
         $barangayName = $pipBarangay['barangay'] ?? null;
 
-        // 2. Try OpenStreetMap (Nominatim) reverse geocoding for exact street / residential compound
-        try {
-            $response = Http::withHeaders([
-                'User-Agent' => 'ParanaqueCSNAlertSystem/1.0 (csn-alert@paranaque.gov.ph)',
-                'Accept' => 'application/json',
-            ])->timeout(3)->get('https://nominatim.openstreetmap.org/reverse', [
-                'lat' => $lat,
-                'lon' => $lng,
-                'format' => 'json',
-                'addressdetails' => 1,
-            ]);
+        // 2. Try OpenStreetMap (Nominatim) reverse geocoding for exact street / residential compound (skip during unit tests)
+        if (! app()->runningUnitTests()) {
+            try {
+                $response = Http::withHeaders([
+                    'User-Agent' => 'ParanaqueCSNAlertSystem/1.0 (csn-alert@paranaque.gov.ph)',
+                    'Accept' => 'application/json',
+                ])->timeout(3)->get('https://nominatim.openstreetmap.org/reverse', [
+                    'lat' => $lat,
+                    'lon' => $lng,
+                    'format' => 'json',
+                    'addressdetails' => 1,
+                ]);
 
-            if ($response->successful()) {
-                $data = $response->json();
-                $addr = $data['address'] ?? [];
+                if ($response->successful()) {
+                    $data = $response->json();
+                    $addr = $data['address'] ?? [];
 
-                $street = $addr['road'] ?? $addr['pedestrian'] ?? null;
-                $neighborhood = $addr['residential'] ?? $addr['suburb'] ?? $addr['neighbourhood'] ?? $addr['quarter'] ?? null;
-                $resolvedBrgy = $barangayName ?? ($addr['quarter'] ?? ($addr['suburb'] ?? null));
+                    $street = $addr['road'] ?? $addr['pedestrian'] ?? null;
+                    $neighborhood = $addr['residential'] ?? $addr['suburb'] ?? $addr['neighbourhood'] ?? $addr['quarter'] ?? null;
+                    $resolvedBrgy = $barangayName ?? ($addr['quarter'] ?? ($addr['suburb'] ?? null));
 
-                $parts = [];
-                if (! empty($street)) {
-                    $parts[] = $street;
-                }
-                if (! empty($neighborhood) && $neighborhood !== $street) {
-                    $parts[] = $neighborhood;
-                }
-                if (! empty($resolvedBrgy)) {
-                    $parts[] = str_starts_with($resolvedBrgy, 'Brgy.') ? $resolvedBrgy : "Brgy. {$resolvedBrgy}";
-                }
-                $parts[] = 'Parañaque City';
+                    $parts = [];
+                    if (! empty($street)) {
+                        $parts[] = $street;
+                    }
+                    if (! empty($neighborhood) && $neighborhood !== $street) {
+                        $parts[] = $neighborhood;
+                    }
+                    if (! empty($resolvedBrgy)) {
+                        $parts[] = str_starts_with($resolvedBrgy, 'Brgy.') ? $resolvedBrgy : "Brgy. {$resolvedBrgy}";
+                    }
+                    $parts[] = 'Parañaque City';
 
-                if (count($parts) >= 2) {
-                    return implode(', ', array_unique($parts));
+                    if (count($parts) >= 2) {
+                        return implode(', ', array_unique($parts));
+                    }
                 }
+            } catch (\Throwable $e) {
+                Log::info('Online reverse geocoding skipped/failed, using local geographic data: '.$e->getMessage());
             }
-        } catch (\Throwable $e) {
-            Log::info('Online reverse geocoding skipped/failed, using local geographic data: '.$e->getMessage());
         }
 
         // 3. Fallback: Identify recognized local landmark / compound within 250m

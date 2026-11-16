@@ -16,7 +16,22 @@ class Emergency extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['type', 'urgency', 'status', 'child_id', 'location', 'responder_id', 'acknowledged_at', 'dispatched_at', 'resolved_at', 'incident_summary'])
+            ->logOnly([
+                'type',
+                'urgency',
+                'status',
+                'child_id',
+                'reported_by_id',
+                'reported_by_role',
+                'location',
+                'facility_room',
+                'responder_id',
+                'acknowledged_at',
+                'dispatched_at',
+                'responder_arrived_at',
+                'resolved_at',
+                'incident_summary',
+            ])
             ->logOnlyDirty()
             ->dontLogEmptyChanges();
     }
@@ -30,7 +45,10 @@ class Emergency extends Model
         'status',
         'child_id',
         'guardian_id',
+        'reported_by_id',
+        'reported_by_role',
         'location',
+        'facility_room',
         'lat',
         'lng',
         'guardian_notes',
@@ -39,6 +57,7 @@ class Emergency extends Model
         'reported_at',
         'acknowledged_at',
         'dispatched_at',
+        'responder_arrived_at',
         'resolved_at',
         'cancelled_at',
         'incident_summary',
@@ -48,12 +67,14 @@ class Emergency extends Model
      * @var array<string, string>
      */
     protected $casts = [
+        'reported_by_id' => 'integer',
         'responder_id' => 'integer',
         'lat' => 'float',
         'lng' => 'float',
         'reported_at' => 'datetime',
         'acknowledged_at' => 'datetime',
         'dispatched_at' => 'datetime',
+        'responder_arrived_at' => 'datetime',
         'resolved_at' => 'datetime',
         'cancelled_at' => 'datetime',
     ];
@@ -102,11 +123,19 @@ class Emergency extends Model
     }
 
     /**
+     * @return BelongsTo<User, $this>
+     */
+    public function reporter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reported_by_id');
+    }
+
+    /**
      * Scope query to active emergencies.
      */
     public function scopeActive($q)
     {
-        return $q->whereIn('status', ['pending', 'responding']);
+        return $q->whereIn('status', ['pending', 'responding', 'arrived']);
     }
 
     /**
@@ -114,7 +143,7 @@ class Emergency extends Model
      */
     public function isActive(): bool
     {
-        return in_array($this->status, ['pending', 'responding'], true);
+        return in_array($this->status, ['pending', 'responding', 'arrived'], true);
     }
 
     /**
@@ -189,6 +218,10 @@ class Emergency extends Model
             'status' => $this->status ?? 'pending',
             'child_id' => $this->child_id,
             'location' => $this->formatted_location,
+            'facilityRoom' => $this->facility_room,
+            'reportedById' => $this->reported_by_id,
+            'reportedByRole' => $this->reported_by_role ?? ($this->reporter?->role ?? 'guardian'),
+            'reportedByName' => $this->reporter?->name ?? ($this->guardian?->name ?? null),
             'lat' => $this->lat !== null ? (float) $this->lat : null,
             'lng' => $this->lng !== null ? (float) $this->lng : null,
             'coords' => $this->coords,
@@ -207,6 +240,8 @@ class Emergency extends Model
             ] : null,
             'acknowledgedAt' => $this->acknowledged_at?->diffForHumans(),
             'dispatchedAt' => $this->dispatched_at?->diffForHumans(),
+            'responderArrivedAt' => $this->responder_arrived_at?->diffForHumans(),
+            'responderArrivedAtTimestamp' => $this->responder_arrived_at?->timestamp,
             'resolvedAt' => $this->resolved_at?->diffForHumans(),
             'resolvedDate' => $this->resolved_at?->format('Y-m-d'),
             'resolvedAtTimestamp' => $this->resolved_at?->timestamp,

@@ -4,12 +4,31 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ChildResource;
+use App\Models\ChildProfile;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 
 class ChildApiController extends Controller
 {
+    /**
+     * List all enrolled Special Child profiles (used by CSN teachers on mobile app).
+     */
+    public function index(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        $isTeacher = $user && ($user->hasRole(['teacher', 'admin', 'superadmin', 'responder'])
+            || in_array(strtolower((string) $user->role), ['teacher', 'admin', 'superadmin', 'responder'], true));
+
+        $children = $isTeacher
+            ? ChildProfile::with('guardian')->orderBy('name')->get()
+            : $user->children()->with('guardian')->orderBy('name')->get();
+
+        return response()->json([
+            'children' => ChildResource::collection($children)->resolve(),
+        ]);
+    }
+
     /**
      * Create or update the guardian's child profile.
      */

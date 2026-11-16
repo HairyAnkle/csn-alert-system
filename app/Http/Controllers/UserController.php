@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
@@ -47,7 +48,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
-            'role' => ['required', 'string', 'in:superadmin,admin,client_admin,responder,guardian,staff'],
+            'role' => ['required', 'string', 'in:superadmin,admin,client_admin,responder,guardian,teacher,staff'],
             'phone' => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
             'is_active' => ['nullable', 'boolean'],
@@ -77,6 +78,7 @@ class UserController extends Controller
             'password' => $password,
         ]);
 
+        Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         $user->assignRole($role);
 
         if (! empty($validated['child_ids'])) {
@@ -121,7 +123,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name' => ['sometimes', 'required', 'string', 'max:255'],
             'email' => ['sometimes', 'required', 'string', 'email', 'max:255', 'unique:users,email,'.$user->id],
-            'role' => ['nullable', 'string', 'in:superadmin,admin,client_admin,responder,guardian,staff'],
+            'role' => ['nullable', 'string', 'in:superadmin,admin,client_admin,responder,guardian,teacher,staff'],
             'phone' => ['nullable', 'string', 'max:50'],
             'status' => ['nullable', 'string', 'in:active,inactive'],
             'is_active' => ['nullable', 'boolean'],
@@ -151,6 +153,7 @@ class UserController extends Controller
         if (! empty($validated['role'])) {
             $role = $validated['role'] === 'staff' ? 'admin' : $validated['role'];
             $updates['role'] = $role;
+            Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
             $user->syncRoles([$role]);
         }
 
@@ -216,7 +219,8 @@ class UserController extends Controller
                 str_contains($raw, 'admin') => 'admin',
                 str_contains($raw, 'guard') => 'guardian',
                 str_contains($raw, 'respond') => 'responder',
-                str_contains($raw, 'staff') || str_contains($raw, 'teacher') => 'admin',
+                str_contains($raw, 'teacher') => 'teacher',
+                str_contains($raw, 'staff') => 'admin',
                 default => $raw,
             };
             $request->merge(['role' => $normalized]);

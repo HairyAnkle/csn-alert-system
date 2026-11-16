@@ -111,6 +111,15 @@ class UserSeeder extends Seeder
                 'phone' => '+63 917 555 0192',
                 'status' => 'active',
             ],
+            [
+                'name' => 'Teacher Clara Reyes',
+                'email' => 'teacher@csn.gov.ph',
+                'password' => Hash::make('password'),
+                'role' => 'teacher',
+                'unit' => 'CSN Center Parañaque — SPED & Therapy Unit',
+                'phone' => '+63 917 222 0002',
+                'status' => 'active',
+            ],
         ];
 
         foreach ($users as $userData) {

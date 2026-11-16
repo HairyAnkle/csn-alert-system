@@ -2,6 +2,33 @@
 
 declare(strict_types=1);
 
+$rawCredentials = env('FIREBASE_CREDENTIALS')
+    ?: env('GOOGLE_APPLICATION_CREDENTIALS')
+    ?: 'storage/app/firebase/firebase-credentials.json';
+
+$credentialsPath = is_string($rawCredentials) ? trim($rawCredentials) : '';
+$resolvedCredentials = null;
+
+if ($credentialsPath !== '') {
+    if (str_starts_with($credentialsPath, '{')) {
+        $resolvedCredentials = $credentialsPath;
+    } else {
+        $isAbsolute = str_starts_with($credentialsPath, '/')
+            || preg_match('/^[A-Za-z]:[\\\\\/]/', $credentialsPath) === 1;
+        $candidate = $isAbsolute
+            ? $credentialsPath
+            : (function_exists('base_path') ? base_path(ltrim($credentialsPath, '/\\')) : $credentialsPath);
+
+        if (is_file($candidate) && is_readable($candidate)) {
+            $resolvedCredentials = $candidate;
+        }
+    }
+}
+
+$defaultCredentialsPath = $credentialsPath !== ''
+    ? $credentialsPath
+    : 'storage/app/firebase/firebase-credentials.json';
+
 return [
     /*
      * ------------------------------------------------------------------------
@@ -19,6 +46,7 @@ return [
 
     'projects' => [
         'app' => [
+            'project_id' => env('FIREBASE_PROJECT_ID') ?: 'csn-paranaque',
 
             /*
              * ------------------------------------------------------------------------
@@ -50,7 +78,8 @@ return [
              *
              */
 
-            'credentials' => env('FIREBASE_CREDENTIALS', env('GOOGLE_APPLICATION_CREDENTIALS')),
+            'credentials' => $resolvedCredentials,
+            'credentials_path' => $defaultCredentialsPath,
 
             /*
              * ------------------------------------------------------------------------

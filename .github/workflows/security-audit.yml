@@ -25,6 +25,11 @@ jobs:
       - name: Install Composer Dependencies
         run: composer install --prefer-dist --no-interaction --no-progress
 
+      - name: Prepare Test Environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
       - name: Audit Composer Dependencies (SAST / CVE Scan)
         run: composer audit
 

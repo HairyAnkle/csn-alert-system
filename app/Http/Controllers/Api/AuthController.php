@@ -8,6 +8,7 @@ use App\Http\Resources\EmergencyResource;
 use App\Models\ChildProfile;
 use App\Models\Emergency;
 use App\Models\User;
+use App\Services\FirestoreService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -516,8 +517,12 @@ class AuthController extends Controller
      */
     private function getFirebaseAdminAccessToken(): ?string
     {
-        $credentialsPath = storage_path('app/firebase/firebase-credentials.json');
-        if (! file_exists($credentialsPath)) {
+        $rawPath = config('firebase.projects.app.credentials')
+            ?? config('firebase.projects.app.credentials_path')
+            ?? storage_path('app/firebase/firebase-credentials.json');
+
+        $credentialsPath = (new FirestoreService)->resolveCredentialsFilePath($rawPath);
+        if (! $credentialsPath || ! is_file($credentialsPath) || ! is_readable($credentialsPath)) {
             return null;
         }
 

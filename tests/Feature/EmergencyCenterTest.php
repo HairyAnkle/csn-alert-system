@@ -145,12 +145,6 @@ class EmergencyCenterTest extends TestCase
 
     public function test_staff_or_responder_can_dispatch_responder_and_triggers_sms_notification(): void
     {
-        $smsMock = Mockery::mock(SmsNotificationService::class);
-        $smsMock->shouldReceive('notifyDispatchedUnit')
-            ->once()
-            ->andReturn(true);
-        $this->app->instance(SmsNotificationService::class, $smsMock);
-
         $staff = User::factory()->create(['role' => 'admin']);
         $staff->assignRole('admin');
 
@@ -166,6 +160,12 @@ class EmergencyCenterTest extends TestCase
             'dispatched_at' => null,
             'responder_id' => null,
         ]);
+
+        $smsMock = Mockery::mock(SmsNotificationService::class);
+        $smsMock->shouldReceive('notifyDispatchedUnit')
+            ->once()
+            ->andReturn(true);
+        $this->app->instance(SmsNotificationService::class, $smsMock);
 
         $response = $this->actingAs($staff)->patchJson("/emergencies/{$emergency->id}/dispatch", [
             'responder_id' => $responder->id,
@@ -238,12 +238,6 @@ class EmergencyCenterTest extends TestCase
 
     public function test_admin_or_superadmin_can_dispatch_barangay_responder_unit_with_eta(): void
     {
-        $smsMock = Mockery::mock(SmsNotificationService::class);
-        $smsMock->shouldReceive('notifyDispatchedUnit')
-            ->once()
-            ->andReturn(true);
-        $this->app->instance(SmsNotificationService::class, $smsMock);
-
         $admin = User::factory()->create(['role' => 'admin']);
         $admin->assignRole('admin');
 
@@ -252,6 +246,12 @@ class EmergencyCenterTest extends TestCase
             'dispatched_at' => null,
             'responder_id' => null,
         ]);
+
+        $smsMock = Mockery::mock(SmsNotificationService::class);
+        $smsMock->shouldReceive('notifyDispatchedUnit')
+            ->once()
+            ->andReturn(true);
+        $this->app->instance(SmsNotificationService::class, $smsMock);
 
         $response = $this->actingAs($admin)->patchJson("/emergencies/{$emergency->id}/dispatch", [
             'barangay_unit' => 'Brgy. BF Homes Emergency Response Team',

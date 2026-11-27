@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 class AnnouncementApiController extends Controller
 {
     /**
-     * List announcements and broadcasts from CSN Center (Section 7.3).
+     * List published announcements and broadcasts from the CSN Center.
      */
     public function index(Request $request): JsonResponse
     {

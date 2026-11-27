@@ -58,11 +58,11 @@ class ChildProfileController extends Controller
             'emergency_contact' => ['nullable', 'string', 'max:100'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:50'],
-            'allergies' => ['nullable', 'string'],
-            'medications' => ['nullable', 'string'],
-            'communication_notes' => ['nullable', 'string'],
-            'medical_notes' => ['nullable', 'string'],
-            'photo' => ['nullable', 'image', 'max:5120'],
+            'allergies' => ['nullable', 'string', 'max:2000'],
+            'medications' => ['nullable', 'string', 'max:2000'],
+            'communication_notes' => ['nullable', 'string', 'max:2000'],
+            'medical_notes' => ['nullable', 'string', 'max:5000'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
 
         $photoPath = null;
@@ -70,10 +70,10 @@ class ChildProfileController extends Controller
             $photoPath = $request->file('photo')->store('children', 'public');
         }
 
-        $guardianId = $validated['guardian_id'] ?? null;
-        if (! $guardianId && $this->isGuardianOnly($request->user())) {
-            $guardianId = $request->user()->id;
-        }
+        // Prevent guardians from attaching new child records to another user's ID.
+        $guardianId = $this->isGuardianOnly($request->user())
+            ? $request->user()->id
+            : ($validated['guardian_id'] ?? null);
 
         $emergencyContact = $validated['emergency_contact_phone'] ?? $validated['emergency_contact'] ?? null;
         $emergencyContactPhone = $validated['emergency_contact_phone'] ?? $validated['emergency_contact'] ?? null;
@@ -141,12 +141,16 @@ class ChildProfileController extends Controller
             'emergency_contact' => ['nullable', 'string', 'max:100'],
             'emergency_contact_name' => ['nullable', 'string', 'max:255'],
             'emergency_contact_phone' => ['nullable', 'string', 'max:50'],
-            'allergies' => ['nullable', 'string'],
-            'medications' => ['nullable', 'string'],
-            'communication_notes' => ['nullable', 'string'],
-            'medical_notes' => ['nullable', 'string'],
-            'photo' => ['nullable', 'image', 'max:5120'],
+            'allergies' => ['nullable', 'string', 'max:2000'],
+            'medications' => ['nullable', 'string', 'max:2000'],
+            'communication_notes' => ['nullable', 'string', 'max:2000'],
+            'medical_notes' => ['nullable', 'string', 'max:5000'],
+            'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ]);
+
+        if ($this->isGuardianOnly($request->user())) {
+            unset($validated['guardian_id']);
+        }
 
         if ($request->hasFile('photo')) {
             if ($child->photo_path) {

@@ -110,14 +110,13 @@ class AuthController extends Controller
         $role = 'guardian';
 
         if ($idToken) {
-            // 1. Try Firebase Auth verification
+            // Verify with Firebase Auth first, falling back to Google tokeninfo.
             try {
                 $auth = app('firebase.auth');
                 $verified = $auth->verifyIdToken($idToken);
                 $email = $verified->claims()->get('email') ?? $email;
                 $name = $verified->claims()->get('name') ?? $name;
             } catch (\Throwable $e) {
-                // 2. Fallback to Google OAuth tokeninfo endpoint
                 try {
                     $googleRes = Http::timeout(5)
                         ->get('https://oauth2.googleapis.com/tokeninfo', ['id_token' => $idToken]);
@@ -153,7 +152,10 @@ class AuthController extends Controller
                 'is_active' => true,
             ]);
         } else {
-            // Update name if user previously had placeholder name and a real name is now provided
+            if ($denied = $this->authorizeMobileUser($user)) {
+                return $denied;
+            }
+
             if ($name !== 'Google User' && (empty($user->name) || $user->name === 'Google User')) {
                 $user->update(['name' => $name]);
             }
@@ -202,6 +204,10 @@ class AuthController extends Controller
                     'is_active' => true,
                 ]);
             } else {
+                if ($denied = $this->authorizeMobileUser($user)) {
+                    return $denied;
+                }
+
                 if ($firebasePhone && empty($user->phone)) {
                     $user->update(['phone' => $firebasePhone]);
                 }
@@ -270,6 +276,10 @@ class AuthController extends Controller
                 'is_active' => true,
             ]);
         } else {
+            if ($denied = $this->authorizeMobileUser($user)) {
+                return $denied;
+            }
+
             $updates = [];
             if (empty($user->phone)) {
                 $updates['phone'] = $storedPhone;
@@ -329,15 +339,13 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Determine OTP code: default 123456 for test/dev, or random 6 digits if Semaphore is configured
         $semaphoreKey = config('services.semaphore.api_key');
         $otp = ! empty($semaphoreKey) ? (string) random_int(100000, 999999) : '123456';
 
-        // Cache OTP for 10 minutes
         Cache::put("csn_phone_otp_{$normalized}", $otp, now()->addMinutes(10));
         Cache::put("csn_phone_otp_{$e164}", $otp, now()->addMinutes(10));
 
-        // 1. Try sending via Semaphore SMS if API key is present
+        // Send via Semaphore SMS gateway when configured.
         $smsSent = false;
         if (! empty($semaphoreKey)) {
             try {
@@ -355,10 +363,9 @@ class AuthController extends Controller
             }
         }
 
-        // 2. Register number into Firebase testPhoneNumbers so Firebase Phone Auth REST API accepts it
+        // Sync number with Firebase Identity Platform when admin credentials are available.
         $this->registerFirebaseTestPhone($e164, $otp);
 
-        // 3. Request sessionInfo from Firebase Identity Platform REST API
         $firebaseApiKey = config('services.firebase.api_key') ?? env('FIREBASE_API_KEY') ?? env('VITE_FIREBASE_API_KEY');
         $sessionInfo = null;
         if (! empty($firebaseApiKey)) {
@@ -427,10 +434,11 @@ class AuthController extends Controller
             }
         }
 
-        // Verify OTP against Cache or fallback test code 123456
+        // Static fallback OTP is permitted only outside production when no SMS gateway key is set.
         if (! $isValid && ! empty($enteredOtp)) {
             $cached = Cache::get("csn_phone_otp_{$normalized}") ?? Cache::get("csn_phone_otp_{$e164}");
-            if (($cached && $cached === $enteredOtp) || $enteredOtp === '123456') {
+            $allowDevFallbackOtp = ! app()->environment('production') && empty(config('services.semaphore.api_key'));
+            if (($cached && $cached === $enteredOtp) || ($allowDevFallbackOtp && $enteredOtp === '123456')) {
                 $isValid = true;
                 Cache::forget("csn_phone_otp_{$normalized}");
                 Cache::forget("csn_phone_otp_{$e164}");
@@ -464,6 +472,10 @@ class AuthController extends Controller
                 'is_active' => true,
             ]);
         } else {
+            if ($denied = $this->authorizeMobileUser($user)) {
+                return $denied;
+            }
+
             $updates = [];
             if (empty($user->phone)) {
                 $updates['phone'] = $e164;
@@ -675,6 +687,28 @@ class AuthController extends Controller
             'children' => $children,
             'active_emergency' => $activeEmergency ? (new EmergencyResource($activeEmergency))->resolve() : null,
         ];
+    }
+
+    /**
+     * Prevent deactivated or web-only administrator accounts from authenticating via mobile endpoints.
+     */
+    private function authorizeMobileUser(User $user): ?JsonResponse
+    {
+        $userRole = strtolower((string) ($user->roles->first()?->name ?? $user->role ?? ''));
+
+        if (in_array($userRole, ['superadmin', 'admin'], true) || $user->hasRole(['superadmin', 'admin'])) {
+            return response()->json([
+                'message' => 'Administrator accounts must sign in through the Web Command Center.',
+            ], 403);
+        }
+
+        if (! $user->is_active) {
+            return response()->json([
+                'message' => 'Your account has been deactivated. Please contact an administrator.',
+            ], 403);
+        }
+
+        return null;
     }
 
     /**

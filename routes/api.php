@@ -9,11 +9,10 @@ use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Mobile Guardian API Routes (Section 7.2)
+| Mobile App API Routes
 |--------------------------------------------------------------------------
 |
-| Handlers for Parañaque CSN Guardian Mobile App.
-| Bearer token authentication via Laravel Sanctum & role:guardian check.
+| Bearer token endpoints (Laravel Sanctum) for the Parañaque CSN mobile app.
 |
 */
 
@@ -21,11 +20,11 @@ Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
     Route::post('register', [AuthController::class, 'register'])->middleware('throttle:10,1');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:5,1');
-    Route::post('google', [AuthController::class, 'google']);   // later
+    Route::post('google', [AuthController::class, 'google'])->middleware('throttle:10,1');
     Route::post('firebase', [AuthController::class, 'firebase'])->middleware('throttle:10,1');
     Route::post('phone', [AuthController::class, 'phone'])->middleware('throttle:10,1');
-    Route::post('phone/send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:10,1');
-    Route::post('phone/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:10,1');
+    Route::post('phone/send-otp', [AuthController::class, 'sendOtp'])->middleware('throttle:5,1');
+    Route::post('phone/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:5,1');
 });
 
 Route::middleware(['auth:sanctum', 'role:guardian|teacher'])->group(function () {

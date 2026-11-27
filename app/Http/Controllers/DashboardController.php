@@ -76,9 +76,6 @@ class DashboardController extends Controller
             })
             ->values();
 
-        $user = auth()->user();
-        $isSuperadmin = $user && ($user->hasRole('superadmin') || $user->role === 'superadmin');
-
         $auditLog = $isSuperadmin
             ? Activity::with('causer')
                 ->latest()
@@ -155,7 +152,6 @@ class DashboardController extends Controller
         $startOfLastMonth = $now->copy()->subMonth()->startOfMonth();
         $endOfLastMonth = $now->copy()->subMonth()->endOfMonth();
 
-        // 1. Total Incidents (Emergency reported dates)
         $thisMonthIncidents = Emergency::where(function ($q) use ($startOfThisMonth, $endOfThisMonth) {
             $q->whereBetween('reported_at', [$startOfThisMonth, $endOfThisMonth])
                 ->orWhere(function ($sub) use ($startOfThisMonth, $endOfThisMonth) {
@@ -172,12 +168,10 @@ class DashboardController extends Controller
 
         $incidentsStat = $this->computeStatChange($thisMonthIncidents, $lastMonthIncidents, 'total incidents from last month');
 
-        // 2. Registered Children
         $thisMonthChildren = ChildProfile::whereBetween('created_at', [$startOfThisMonth, $endOfThisMonth])->count();
         $lastMonthChildren = ChildProfile::whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])->count();
         $childrenStat = $this->computeStatChange($thisMonthChildren, $lastMonthChildren, 'from last month');
 
-        // 3. Units Responding / Dispatches
         $thisMonthUnits = Emergency::whereNotNull('dispatched_at')
             ->whereBetween('dispatched_at', [$startOfThisMonth, $endOfThisMonth])
             ->count();
@@ -186,7 +180,6 @@ class DashboardController extends Controller
             ->count();
         $unitsStat = $this->computeStatChange($thisMonthUnits, $lastMonthUnits, 'from last month');
 
-        // 4. Resolved Emergencies
         $thisMonthResolved = Emergency::where('status', 'resolved')
             ->where(function ($q) use ($startOfThisMonth, $endOfThisMonth) {
                 $q->whereBetween('resolved_at', [$startOfThisMonth, $endOfThisMonth])

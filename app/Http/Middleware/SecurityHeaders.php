@@ -19,22 +19,16 @@ class SecurityHeaders
     {
         $response = $next($request);
 
-        // Prevent MIME type sniffing
         $response->headers->set('X-Content-Type-Options', 'nosniff');
-
-        // Prevent Clickjacking
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
-
-        // Enforce strict referrer policy
         $response->headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
-
-        // Restrict sensitive browser features
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), payment=(), usb=()');
-
-        // XSS Filter defense for legacy user agents
         $response->headers->set('X-XSS-Protection', '1; mode=block');
 
-        // Content Security Policy (permitting CDN assets, Leaflet maps, WebSockets, and inline Tailwind/Alpine bindings)
+        if ($request->isSecure()) {
+            $response->headers->set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+        }
+
         if (! $response->headers->has('Content-Security-Policy')) {
             $viteDev = app()->environment('local') ? 'http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*' : '';
 
